@@ -183,7 +183,6 @@
 
           <div class="mt-4 bg-[#FFF9F3] rounded-[22px] border border-brand-100 p-5 data-text">
             <div class="flex justify-between gap-5 py-2"><span class="text-muted">報名截止</span><span class="font-semibold text-right">{{ formatDeadline(selectedSession.registration_deadline) }}</span></div>
-            <div class="flex justify-between gap-5 py-2"><span class="text-muted">取消截止</span><span class="font-semibold text-right">{{ formatDeadline(selectedSession.cancel_deadline) }}</span></div>
           </div>
 
           <div class="mt-5">
@@ -301,7 +300,7 @@
           <!-- HOME -->
           <div v-if="activeTab === 'home'" class="px-4 py-5">
             <div class="rounded-[22px] bg-gradient-to-br from-brand-500 to-brand-700 text-white p-5 shadow-card">
-              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2.5 py-1 text-[13px] font-bold tracking-wide">v1.0.2</span>
+              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2.5 py-1 text-[13px] font-bold tracking-wide">v1.0.3</span>
               <h1 class="text-[27px] font-bold leading-tight mt-3">近期球敘</h1>
             </div>
 
@@ -460,9 +459,10 @@
                 </button>
               </div>
 
-              <div class="mt-5 bg-gray-100 p-1 rounded-xl flex">
-                <button @click="adminMode = 'sessions'" class="flex-1 min-h-0 h-11 rounded-lg font-bold text-[15px]" :class="adminMode === 'sessions' ? 'bg-white shadow-sm' : 'text-muted'">場次與名單</button>
-                <button @click="openAdminFinance" class="flex-1 min-h-0 h-11 rounded-lg font-bold text-[15px]" :class="adminMode === 'finance' ? 'bg-white shadow-sm' : 'text-muted'">財務紀錄</button>
+              <div class="mt-5 bg-gray-100 p-1 rounded-xl grid grid-cols-3 gap-1">
+                <button @click="adminMode = 'sessions'" class="min-h-0 h-11 rounded-lg font-bold text-[14px]" :class="adminMode === 'sessions' ? 'bg-white shadow-sm' : 'text-muted'">場次</button>
+                <button @click="openAdminPlayers" class="min-h-0 h-11 rounded-lg font-bold text-[14px]" :class="adminMode === 'players' ? 'bg-white shadow-sm' : 'text-muted'">球友與套票</button>
+                <button @click="openAdminFinance" class="min-h-0 h-11 rounded-lg font-bold text-[14px]" :class="adminMode === 'finance' ? 'bg-white shadow-sm' : 'text-muted'">財務</button>
               </div>
 
               <div v-if="adminMode === 'sessions'" class="mt-4 flex flex-col gap-4">
@@ -486,7 +486,51 @@
                 <div v-if="adminSessions.length === 0" class="rounded-[22px] border border-dashed border-gray-300 bg-white p-10 text-center text-muted">目前沒有場次</div>
               </div>
 
-              <div v-else class="mt-4">
+              <div v-else-if="adminMode === 'players'" class="mt-4">
+                <div class="bg-white rounded-[22px] border border-line shadow-card p-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <div class="font-bold text-[19px]">球友與套票</div>
+                      <div class="text-[13px] text-muted mt-1">手機號碼為主要識別</div>
+                    </div>
+                    <button @click="openPackagePlans" class="min-h-0 h-10 px-3 rounded-xl border border-brand-100 bg-brand-50 text-brand-700 font-bold text-[14px]">套票方案</button>
+                  </div>
+                  <div class="mt-4 flex gap-2">
+                    <input v-model.trim="adminPlayerSearch" @keyup.enter="loadAdminPlayers(true)" type="text" placeholder="輸入暱稱或手機" class="flex-1 min-w-0 h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
+                    <button @click="loadAdminPlayers(true)" class="h-12 min-h-0 px-4 rounded-xl bg-ink text-white font-bold">搜尋</button>
+                  </div>
+                </div>
+
+                <div v-if="adminPlayersLoading" class="py-12 flex justify-center">
+                  <div class="w-8 h-8 rounded-full border-[3px] border-brand-100 border-t-brand-500 animate-spin"></div>
+                </div>
+
+                <div v-else class="mt-4 flex flex-col gap-3">
+                  <article v-for="row in adminPlayers" :key="row.player_id" class="bg-white rounded-[20px] border border-line shadow-card p-4">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <div class="font-bold text-[18px]">{{ row.nickname }}</div>
+                          <span class="text-[12px] rounded-full px-2 py-0.5 font-bold" :class="row.is_registered ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'">{{ row.is_registered ? '已註冊' : '未註冊' }}</span>
+                          <span v-if="row.has_dupr" class="text-[12px] rounded-full px-2 py-0.5 bg-brand-50 text-brand-700 font-bold">DUPR</span>
+                        </div>
+                        <div class="text-[15px] text-muted mt-1">{{ row.phone }}</div>
+                        <div class="text-[13px] text-muted mt-2">歷史報名 {{ row.booking_count }} 場<span v-if="row.last_booking_at"> · 最近 {{ formatDateShort(row.last_booking_at) }}</span></div>
+                      </div>
+                      <div class="text-right shrink-0">
+                        <div class="text-[12px] text-muted">套票餘額</div>
+                        <div class="font-bold text-[25px] leading-tight mt-1">{{ row.package_balance }}</div>
+                        <div class="text-[12px] text-muted">次</div>
+                      </div>
+                    </div>
+                    <button @click="openAdminPlayer(row)" class="mt-4 w-full rounded-xl border border-brand-100 bg-brand-50 text-brand-700 font-bold py-2.5">管理球友與套票</button>
+                  </article>
+                  <div v-if="adminPlayers.length === 0" class="rounded-[20px] border border-dashed border-gray-300 bg-white p-9 text-center text-muted">找不到符合條件的球友</div>
+                  <button v-if="adminPlayersHasMore" @click="loadMoreAdminPlayers" class="w-full rounded-xl border border-line bg-white font-bold py-3">載入更多</button>
+                </div>
+              </div>
+
+              <div v-else-if="adminMode === 'finance'" class="mt-4">
                 <div class="bg-white rounded-[22px] border border-line shadow-card p-4">
                   <label class="block font-bold mb-2">搜尋球友</label>
                   <input v-model.trim="financeFilter.search" @keyup.enter="loadAdminFinance(true)" type="text" placeholder="暱稱、手機或帳號" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
@@ -710,6 +754,117 @@
       </div>
     </Transition>
 
+    <!-- ADMIN PLAYER / PACKAGE SHEET -->
+    <Transition name="fade">
+      <div v-if="showAdminPlayer" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showAdminPlayer = false">
+        <Transition name="sheet" appear>
+          <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float max-h-[92vh] overflow-y-auto app-scroll">
+            <div class="flex justify-between items-start gap-4">
+              <div>
+                <div class="text-[14px] font-bold text-brand-600">PLAYER</div>
+                <h2 class="text-[24px] font-bold mt-1">{{ adminPlayerTarget?.nickname }}</h2>
+                <div class="text-[15px] text-muted mt-1">{{ adminPlayerTarget?.phone }}</div>
+              </div>
+              <button @click="showAdminPlayer = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            </div>
+
+            <div class="mt-5 rounded-2xl bg-ink text-white p-5">
+              <div class="text-[13px] text-gray-300">目前套票餘額</div>
+              <div class="text-[34px] font-bold mt-1">{{ adminPlayerTarget?.package_balance ?? 0 }} <span class="text-[15px] font-medium">次</span></div>
+            </div>
+
+            <div class="mt-4 rounded-2xl border border-line p-4">
+              <div class="font-bold text-[18px]">購買套票</div>
+              <select v-model="selectedPackagePlanId" class="mt-3 w-full h-12 rounded-xl border border-line px-3 bg-white">
+                <option value="">選擇套票方案</option>
+                <option v-for="plan in activePackagePlans" :key="plan.plan_id" :value="plan.plan_id">{{ plan.name }} · {{ plan.units }} 次 · NT$ {{ money(plan.price) }}</option>
+              </select>
+              <button @click="purchasePackageForPlayer" :disabled="adminActionLoading || !selectedPackagePlanId" class="mt-3 w-full rounded-xl bg-brand-500 text-white font-bold py-3 disabled:opacity-50">確認新增套票</button>
+            </div>
+
+            <div class="mt-4 rounded-2xl border border-line p-4">
+              <div class="font-bold text-[18px]">人工調整</div>
+              <div class="text-[13px] text-muted mt-1">歷史不直接修改；需要修正時新增一筆調整紀錄。</div>
+              <div class="grid grid-cols-2 gap-3 mt-3">
+                <div><label class="text-[14px] font-bold block mb-1.5">金額增減</label><input v-model.number="adminAdjustmentForm.amount" type="number" class="w-full h-12 rounded-xl border border-line px-3" placeholder="0"></div>
+                <div><label class="text-[14px] font-bold block mb-1.5">套票增減</label><input v-model.number="adminAdjustmentForm.packageDelta" type="number" class="w-full h-12 rounded-xl border border-line px-3" placeholder="0"></div>
+              </div>
+              <div class="mt-3"><label class="text-[14px] font-bold block mb-1.5">原因備註</label><input v-model.trim="adminAdjustmentForm.note" class="w-full h-12 rounded-xl border border-line px-4" placeholder="例如：補回一次、人工退款"></div>
+              <button @click="addPlayerAdjustment" :disabled="adminActionLoading" class="mt-3 w-full rounded-xl border border-brand-200 bg-brand-50 text-brand-700 font-bold py-3 disabled:opacity-50">新增調整紀錄</button>
+            </div>
+
+            <div class="mt-5">
+              <div class="flex items-center justify-between">
+                <div class="font-bold text-[18px]">最近財務</div>
+                <div class="text-[13px] text-muted">最新 30 筆</div>
+              </div>
+              <div v-if="adminPlayerHistoryLoading" class="py-8 flex justify-center"><div class="w-7 h-7 rounded-full border-[3px] border-brand-100 border-t-brand-500 animate-spin"></div></div>
+              <div v-else class="mt-2 border border-line rounded-2xl overflow-hidden divide-y divide-gray-100">
+                <div v-for="row in adminPlayerHistory" :key="row.entry_id" class="p-3.5">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="font-semibold">{{ row.note || '財務紀錄' }}</div>
+                      <div class="text-[13px] text-muted mt-1">{{ formatDateTime(row.created_at) }}<span v-if="row.venue"> · {{ row.venue }}</span></div>
+                    </div>
+                    <div class="text-right shrink-0">
+                      <div v-if="row.amount" class="font-bold">NT$ {{ money(row.amount) }}</div>
+                      <div v-if="row.package_delta" class="font-bold text-brand-700">{{ signedUnits(row.package_delta) }} 次</div>
+                    </div>
+                  </div>
+                </div>
+                <div v-if="adminPlayerHistory.length === 0" class="p-7 text-center text-muted">目前沒有財務紀錄</div>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+
+    <!-- PACKAGE PLAN SHEET -->
+    <Transition name="fade">
+      <div v-if="showPackagePlans" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showPackagePlans = false">
+        <Transition name="sheet" appear>
+          <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float max-h-[92vh] overflow-y-auto app-scroll">
+            <div class="flex justify-between items-center">
+              <div><div class="text-[14px] font-bold text-brand-600">PACKAGE</div><h2 class="text-[24px] font-bold mt-1">套票方案</h2></div>
+              <button @click="showPackagePlans = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+            </div>
+
+            <div class="mt-5 rounded-2xl border border-line p-4">
+              <div class="font-bold text-[18px]">{{ packagePlanForm.id ? '編輯方案' : '新增方案' }}</div>
+              <div class="mt-3"><label class="text-[14px] font-bold block mb-1.5">方案名稱</label><input v-model.trim="packagePlanForm.name" class="w-full h-12 rounded-xl border border-line px-4" placeholder="例如：10 次套票"></div>
+              <div class="grid grid-cols-2 gap-3 mt-3">
+                <div><label class="text-[14px] font-bold block mb-1.5">次數</label><input v-model.number="packagePlanForm.units" type="number" min="1" class="w-full h-12 rounded-xl border border-line px-3"></div>
+                <div><label class="text-[14px] font-bold block mb-1.5">價格</label><input v-model.number="packagePlanForm.price" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-3"></div>
+              </div>
+              <label v-if="packagePlanForm.id" class="mt-3 flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5 cursor-pointer">
+                <span class="font-semibold">啟用此方案</span>
+                <input v-model="packagePlanForm.active" type="checkbox" class="w-5 h-5 accent-orange-500">
+              </label>
+              <div class="flex gap-2 mt-3">
+                <button @click="savePackagePlan" :disabled="adminActionLoading" class="flex-1 rounded-xl bg-brand-500 text-white font-bold py-3 disabled:opacity-50">{{ packagePlanForm.id ? '儲存方案' : '新增方案' }}</button>
+                <button v-if="packagePlanForm.id" @click="resetPackagePlanForm" class="rounded-xl border border-line px-4 font-bold">取消編輯</button>
+              </div>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-2">
+              <article v-for="plan in packagePlans" :key="plan.plan_id" class="rounded-2xl border border-line p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="font-bold text-[17px]">{{ plan.name }}</div>
+                    <div class="text-[14px] text-muted mt-1">{{ plan.units }} 次 · NT$ {{ money(plan.price) }}</div>
+                  </div>
+                  <span class="text-[12px] rounded-full px-2 py-1 font-bold" :class="plan.active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'">{{ plan.active ? '啟用' : '停用' }}</span>
+                </div>
+                <button @click="editPackagePlan(plan)" class="mt-3 w-full rounded-xl border border-line font-bold py-2.5">編輯</button>
+              </article>
+              <div v-if="packagePlans.length === 0" class="p-8 text-center text-muted">目前沒有套票方案</div>
+            </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+
     <!-- FINANCE EDIT SHEET -->
     <Transition name="fade">
       <div v-if="showFinanceEdit" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showFinanceEdit = false">
@@ -740,7 +895,6 @@
               <div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">類型</label><input v-model.trim="sessionForm.category" class="w-full h-12 rounded-xl border border-line px-4" placeholder="一般場"></div><div><label class="font-bold block mb-2">人數上限</label><input v-model.number="sessionForm.capacity" type="number" min="1" class="w-full h-12 rounded-xl border border-line px-4"></div></div>
               <div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">單次費用</label><input v-model.number="sessionForm.price" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4"></div><div><label class="font-bold block mb-2">套票扣次</label><input v-model.number="sessionForm.units" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4"></div></div>
               <div><label class="font-bold block mb-2">報名截止</label><input v-model="sessionForm.registrationDeadline" type="datetime-local" class="w-full h-12 rounded-xl border border-line px-3"></div>
-              <div><label class="font-bold block mb-2">取消截止</label><input v-model="sessionForm.cancelDeadline" type="datetime-local" class="w-full h-12 rounded-xl border border-line px-3"></div>
               <div><label class="font-bold block mb-2">公開備註</label><textarea v-model.trim="sessionForm.publicNote" rows="3" class="w-full rounded-xl border border-line p-4 resize-none" placeholder="球友可見"></textarea></div>
               <div><label class="font-bold block mb-2">內部備註</label><textarea v-model.trim="sessionForm.internalNote" rows="3" class="w-full rounded-xl border border-line p-4 resize-none" placeholder="僅管理員可見"></textarea></div>
               <button @click="createSession" :disabled="adminActionLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ adminActionLoading ? '建立中…' : '建立並開放報名' }}</button>
@@ -849,6 +1003,23 @@
       const adminFinanceHasMore = ref(false);
       const financeFilter = ref({ search: '', from: '', to: '' });
 
+      const adminPlayers = ref([]);
+      const adminPlayersLoading = ref(false);
+      const adminPlayersOffset = ref(0);
+      const adminPlayersHasMore = ref(false);
+      const adminPlayerSearch = ref('');
+      const showAdminPlayer = ref(false);
+      const adminPlayerTarget = ref(null);
+      const adminPlayerHistory = ref([]);
+      const adminPlayerHistoryLoading = ref(false);
+      const packagePlans = ref([]);
+      const selectedPackagePlanId = ref('');
+      const showPackagePlans = ref(false);
+      const adminAdjustmentForm = ref({ amount: 0, packageDelta: 0, note: '' });
+      const packagePlanForm = ref({ id: null, name: '', units: 10, price: 0, active: true });
+
+      const activePackagePlans = computed(() => packagePlans.value.filter(plan => plan.active));
+
       const showFinanceEdit = ref(false);
       const financeEditTarget = ref(null);
       const financeEditForm = ref({ amount: 0, packageDelta: 0, note: '' });
@@ -856,7 +1027,7 @@
       const showCreateSession = ref(false);
       const sessionForm = ref({
         start: '', end: '', venue: '', category: '一般場', capacity: 10,
-        price: 500, units: 1, registrationDeadline: '', cancelDeadline: '',
+        price: 500, units: 1, registrationDeadline: '',
         publicNote: '', internalNote: ''
       });
 
@@ -1025,6 +1196,154 @@
         adminSessions.value = data || [];
       }
 
+      async function openAdminPlayers() {
+        adminMode.value = 'players';
+        await Promise.all([loadAdminPlayers(true), loadPackagePlans()]);
+      }
+
+      async function loadAdminPlayers(reset = true) {
+        if (profile.value?.role !== 'admin') return;
+        adminPlayersLoading.value = true;
+        if (reset) adminPlayersOffset.value = 0;
+        const { data, error } = await sb.rpc('search_admin_players', {
+          p_search: adminPlayerSearch.value || null,
+          p_limit: 30,
+          p_offset: adminPlayersOffset.value
+        });
+        adminPlayersLoading.value = false;
+        if (error) { showToast(`球友查詢失敗：${error.message}`); return; }
+        if (reset) adminPlayers.value = data || [];
+        else adminPlayers.value.push(...(data || []));
+        adminPlayersHasMore.value = (data || []).length === 30;
+      }
+
+      async function loadMoreAdminPlayers() {
+        adminPlayersOffset.value += 30;
+        await loadAdminPlayers(false);
+      }
+
+      async function loadPackagePlans() {
+        if (profile.value?.role !== 'admin') return;
+        const { data, error } = await sb.rpc('list_admin_package_plans');
+        if (error) { showToast(`套票方案載入失敗：${error.message}`); return; }
+        packagePlans.value = data || [];
+      }
+
+      async function loadAdminPlayerHistory(playerId) {
+        adminPlayerHistoryLoading.value = true;
+        const { data, error } = await sb.rpc('get_admin_player_financial_history', {
+          p_player_id: playerId, p_limit: 30, p_offset: 0
+        });
+        adminPlayerHistoryLoading.value = false;
+        if (error) { showToast(`球友財務載入失敗：${error.message}`); return; }
+        adminPlayerHistory.value = data || [];
+      }
+
+      async function openAdminPlayer(row) {
+        adminPlayerTarget.value = { ...row };
+        adminAdjustmentForm.value = { amount: 0, packageDelta: 0, note: '' };
+        await loadPackagePlans();
+        selectedPackagePlanId.value = activePackagePlans.value[0]?.plan_id || '';
+        showAdminPlayer.value = true;
+        await loadAdminPlayerHistory(row.player_id);
+      }
+
+      async function refreshAdminPlayer() {
+        if (!adminPlayerTarget.value) return;
+        const { data, error } = await sb.rpc('search_admin_players', {
+          p_search: adminPlayerTarget.value.phone, p_limit: 30, p_offset: 0
+        });
+        if (!error) {
+          const exact = (data || []).find(row => row.player_id === adminPlayerTarget.value.player_id);
+          if (exact) adminPlayerTarget.value = { ...exact };
+        }
+        await Promise.all([loadAdminPlayerHistory(adminPlayerTarget.value.player_id), loadAdminPlayers(true)]);
+      }
+
+      async function purchasePackageForPlayer() {
+        if (!adminPlayerTarget.value || !selectedPackagePlanId.value) return;
+        const plan = packagePlans.value.find(p => p.plan_id === selectedPackagePlanId.value);
+        if (!plan) return;
+        if (!confirm(`確認替 ${adminPlayerTarget.value.nickname} 新增「${plan.name}」？`)) return;
+        adminActionLoading.value = true;
+        try {
+          const { error } = await sb.rpc('add_package_purchase', {
+            p_player_id: adminPlayerTarget.value.player_id,
+            p_package_plan_id: plan.plan_id,
+            p_note: null
+          });
+          if (error) throw error;
+          await refreshAdminPlayer();
+          showToast('套票已新增');
+        } catch (e) { showToast(e?.message || String(e)); }
+        finally { adminActionLoading.value = false; }
+      }
+
+      async function addPlayerAdjustment() {
+        if (!adminPlayerTarget.value) return;
+        const amount = Number(adminAdjustmentForm.value.amount || 0);
+        const packageDelta = Number(adminAdjustmentForm.value.packageDelta || 0);
+        const note = adminAdjustmentForm.value.note.trim();
+        if (amount === 0 && packageDelta === 0) { showToast('請輸入金額或套票調整'); return; }
+        if (!note) { showToast('人工調整必須填寫原因'); return; }
+        if (!confirm('確認新增這筆人工調整？原歷史不會被修改。')) return;
+        adminActionLoading.value = true;
+        try {
+          const { error } = await sb.rpc('add_financial_adjustment', {
+            p_player_id: adminPlayerTarget.value.player_id,
+            p_amount: amount,
+            p_package_delta: packageDelta,
+            p_note: note,
+            p_session_id: null
+          });
+          if (error) throw error;
+          adminAdjustmentForm.value = { amount: 0, packageDelta: 0, note: '' };
+          await refreshAdminPlayer();
+          showToast('調整紀錄已新增');
+        } catch (e) { showToast(e?.message || String(e)); }
+        finally { adminActionLoading.value = false; }
+      }
+
+      function resetPackagePlanForm() {
+        packagePlanForm.value = { id: null, name: '', units: 10, price: 0, active: true };
+      }
+
+      async function openPackagePlans() {
+        resetPackagePlanForm();
+        await loadPackagePlans();
+        showPackagePlans.value = true;
+      }
+
+      function editPackagePlan(plan) {
+        packagePlanForm.value = { id: plan.plan_id, name: plan.name, units: Number(plan.units), price: Number(plan.price), active: !!plan.active };
+      }
+
+      async function savePackagePlan() {
+        const form = packagePlanForm.value;
+        if (!form.name) { showToast('請輸入方案名稱'); return; }
+        if (Number(form.units) <= 0) { showToast('套票次數必須大於 0'); return; }
+        if (Number(form.price) < 0) { showToast('價格不能小於 0'); return; }
+        adminActionLoading.value = true;
+        try {
+          let error;
+          if (form.id) {
+            ({ error } = await sb.rpc('update_package_plan', {
+              p_plan_id: form.id, p_name: form.name, p_units: Number(form.units), p_price: Number(form.price), p_active: !!form.active
+            }));
+          } else {
+            ({ error } = await sb.rpc('create_package_plan', {
+              p_name: form.name, p_units: Number(form.units), p_price: Number(form.price)
+            }));
+          }
+          if (error) throw error;
+          await loadPackagePlans();
+          const wasEdit = !!form.id;
+          resetPackagePlanForm();
+          showToast(wasEdit ? '套票方案已更新' : '套票方案已新增');
+        } catch (e) { showToast(e?.message || String(e)); }
+        finally { adminActionLoading.value = false; }
+      }
+
       function filterDateArgs() {
         let from = null, to = null;
         if (financeFilter.value.from) from = new Date(`${financeFilter.value.from}T00:00:00+08:00`).toISOString();
@@ -1118,6 +1437,7 @@
         if (tab === 'admin') {
           loadAdminSessions();
           if (adminMode.value === 'finance') loadAdminFinance(true);
+          if (adminMode.value === 'players') loadAdminPlayers(true);
         }
       }
 
@@ -1467,7 +1787,7 @@
             default_price: Number(sessionForm.value.price || 0),
             default_package_units: Number(sessionForm.value.units || 0),
             registration_deadline: toIsoOrNull(sessionForm.value.registrationDeadline),
-            cancel_deadline: toIsoOrNull(sessionForm.value.cancelDeadline),
+            cancel_deadline: null,
             status: 'open',
             public_note: sessionForm.value.publicNote || null,
             internal_note: sessionForm.value.internalNote || null,
@@ -1476,7 +1796,7 @@
           const { error } = await sb.from('sessions').insert(payload);
           if (error) throw error;
           showCreateSession.value = false;
-          sessionForm.value = { start: '', end: '', venue: '', category: '一般場', capacity: 10, price: 500, units: 1, registrationDeadline: '', cancelDeadline: '', publicNote: '', internalNote: '' };
+          sessionForm.value = { start: '', end: '', venue: '', category: '一般場', capacity: 10, price: 500, units: 1, registrationDeadline: '', publicNote: '', internalNote: '' };
           await Promise.all([loadAdminSessions(), loadPublicSessions()]);
           showToast('新場次已建立並開放報名');
         } catch (e) { showToast(e?.message || String(e)); }
@@ -1510,6 +1830,9 @@
         showSubstitute, substituteLoading, substituteForm, substituteContext,
         adminMode, adminSessions, adminSelectedSession, adminRoster, adminRosterLoading,
         adminActionLoading, adminFinance, adminFinanceHasMore, financeFilter,
+        adminPlayers, adminPlayersLoading, adminPlayersHasMore, adminPlayerSearch,
+        showAdminPlayer, adminPlayerTarget, adminPlayerHistory, adminPlayerHistoryLoading,
+        packagePlans, activePackagePlans, selectedPackagePlanId, showPackagePlans, adminAdjustmentForm, packagePlanForm,
         showFinanceEdit, financeEditForm, showCreateSession, sessionForm,
         money, signedUnits, formatDateShort, formatDateLong, formatTimeRange, formatDateTime, formatDeadline,
         sessionProgress, sessionStatusText, sessionStatusClass, sessionDbStatusText,
@@ -1520,7 +1843,10 @@
         cancelMyBooking, openSubstitute, openAdminSubstitute, submitSubstitute, cancelAdminBooking,
         openProfile, saveProfile,
         openAdminSession, confirmFinance, reopenFinance, openFinanceEdit, saveFinanceEdit,
-        settleCurrentSession, openAdminFinance, loadAdminFinance, loadMoreAdminFinance, exportFinanceCsv, createSession
+        settleCurrentSession,
+        openAdminPlayers, loadAdminPlayers, loadMoreAdminPlayers, openAdminPlayer, purchasePackageForPlayer, addPlayerAdjustment,
+        openPackagePlans, editPackagePlan, resetPackagePlanForm, savePackagePlan,
+        openAdminFinance, loadAdminFinance, loadMoreAdminFinance, exportFinanceCsv, createSession
       };
     }
   }).mount('#app');
