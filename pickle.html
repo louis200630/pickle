@@ -274,10 +274,22 @@
                   </div>
                 </div>
 
-                <div v-if="adminSelectedSession.status === 'open' && row.booking_status === 'active'" class="mt-3 flex gap-2">
-                  <button v-if="row.financial_status === 'pending'" @click="confirmFinance(row)" class="flex-1 rounded-xl bg-brand-500 text-white font-bold py-2.5">確認收款</button>
-                  <button v-if="row.financial_status === 'pending'" @click="openFinanceEdit(row)" class="rounded-xl border border-line bg-white px-4 font-bold text-gray-700">調整</button>
-                  <button v-if="row.financial_status === 'confirmed'" @click="reopenFinance(row)" class="w-full rounded-xl border border-line bg-white text-gray-700 font-bold py-2.5">改回待確認</button>
+                <div v-if="adminSelectedSession.status === 'open' && row.booking_status === 'active'" class="mt-3">
+                  <div class="flex gap-2">
+                    <button v-if="row.financial_status === 'pending'" @click="confirmFinance(row)" class="flex-1 rounded-xl bg-brand-500 text-white font-bold py-2.5">確認收款</button>
+                    <button v-if="row.financial_status === 'pending'" @click="openFinanceEdit(row)" class="rounded-xl border border-line bg-white px-4 font-bold text-gray-700">調整</button>
+                    <button v-if="row.financial_status === 'confirmed'" @click="reopenFinance(row)" class="w-full rounded-xl border border-line bg-white text-gray-700 font-bold py-2.5">改回待確認</button>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-100">
+                    <button @click="openAdminSubstitute(row)" class="rounded-xl border border-line bg-white text-gray-700 font-bold py-2.5 flex items-center justify-center gap-2">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+                      更換參加者
+                    </button>
+                    <button @click="cancelAdminBooking(row)" class="rounded-xl border border-red-200 bg-white text-red-600 font-bold py-2.5 flex items-center justify-center gap-2">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v5M14 11v5"/></svg>
+                      取消報名
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -289,7 +301,7 @@
           <!-- HOME -->
           <div v-if="activeTab === 'home'" class="px-4 py-5">
             <div class="rounded-[22px] bg-gradient-to-br from-brand-500 to-brand-700 text-white p-5 shadow-card">
-              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2.5 py-1 text-[13px] font-bold tracking-wide">v1.0.1</span>
+              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2.5 py-1 text-[13px] font-bold tracking-wide">v1.0.2</span>
               <h1 class="text-[27px] font-bold leading-tight mt-3">近期球敘</h1>
             </div>
 
@@ -685,8 +697,8 @@
       <div v-if="showSubstitute" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showSubstitute = false">
         <Transition name="sheet" appear>
           <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float">
-            <div class="flex justify-between items-center"><h2 class="text-[23px] font-bold">更換參加者</h2><button @click="showSubstitute = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
-            <p class="text-muted leading-7">填入實際接手名額的球友。已確認收款後，球友端不能自行更換。</p>
+            <div class="flex justify-between items-center"><h2 class="text-[23px] font-bold">{{ substituteContext === 'admin' ? '管理員更換參加者' : '更換參加者' }}</h2><button @click="showSubstitute = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+            <p class="text-muted leading-7">{{ substituteContext === 'admin' ? '更換實際參加者。若此名額已收款，原本的收款紀錄會保留作為帳務軌跡。' : '填入實際接手名額的球友。已確認收款後，球友端不能自行更換。' }}</p>
             <div class="flex flex-col gap-4">
               <div><label class="font-bold block mb-2">新參加者暱稱</label><input v-model.trim="substituteForm.nickname" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               <div><label class="font-bold block mb-2">新參加者手機</label><input v-model.trim="substituteForm.phone" type="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
@@ -823,6 +835,7 @@
       const showSubstitute = ref(false);
       const substituteLoading = ref(false);
       const substituteTarget = ref(null);
+      const substituteContext = ref('player');
       const substituteForm = ref({ nickname: '', phone: '', note: '' });
 
       const adminMode = ref('sessions');
@@ -1259,6 +1272,14 @@
       }
 
       function openSubstitute(row) {
+        substituteContext.value = 'player';
+        substituteTarget.value = row;
+        substituteForm.value = { nickname: '', phone: '', note: '' };
+        showSubstitute.value = true;
+      }
+
+      function openAdminSubstitute(row) {
+        substituteContext.value = 'admin';
         substituteTarget.value = row;
         substituteForm.value = { nickname: '', phone: '', note: '' };
         showSubstitute.value = true;
@@ -1277,12 +1298,37 @@
           });
           if (error) throw error;
           showSubstitute.value = false;
-          await Promise.all([loadMyData(true), loadPublicSessions()]);
-          showToast('參加者已更新');
+          if (substituteContext.value === 'admin') {
+            await Promise.all([refreshAdminDetail(), loadPublicSessions(), loadMyData(true)]);
+            showToast('參加者已更新，原收款紀錄已依規則保留');
+          } else {
+            await Promise.all([loadMyData(true), loadPublicSessions()]);
+            showToast('參加者已更新');
+          }
         } catch (e) {
           showToast(e?.message || String(e));
         } finally {
           substituteLoading.value = false;
+        }
+      }
+
+      async function cancelAdminBooking(row) {
+        const confirmed = row.financial_status === 'confirmed';
+        const message = confirmed
+          ? `確定取消「${row.nickname}」的報名嗎？\n\n此筆已收款，取消後原收款紀錄仍會保留。若需要退款或補回套票，請另外新增財務修正。`
+          : `確定取消「${row.nickname}」的報名嗎？\n\n此筆尚未確認收款，取消後待確認財務紀錄會一併移除。`;
+        if (!confirm(message)) return;
+
+        adminActionLoading.value = true;
+        try {
+          const { error } = await sb.rpc('cancel_booking', { p_booking_id: row.booking_id });
+          if (error) throw error;
+          await Promise.all([refreshAdminDetail(), loadPublicSessions(), loadMyData(true)]);
+          showToast(confirmed ? '報名已取消，原收款歷史已保留' : '報名已取消');
+        } catch (e) {
+          showToast(e?.message || String(e));
+        } finally {
+          adminActionLoading.value = false;
         }
       }
 
@@ -1461,7 +1507,7 @@
         recordsMode, recordsLoading, myBookings, myFinance, packageBalance,
         myBookingsHasMore, myFinanceHasMore,
         showProfile, profileLoading, profileError, profileForm,
-        showSubstitute, substituteLoading, substituteForm,
+        showSubstitute, substituteLoading, substituteForm, substituteContext,
         adminMode, adminSessions, adminSelectedSession, adminRoster, adminRosterLoading,
         adminActionLoading, adminFinance, adminFinanceHasMore, financeFilter,
         showFinanceEdit, financeEditForm, showCreateSession, sessionForm,
@@ -1471,7 +1517,7 @@
         openAuth, switchAuthMode, submitAuth, logout,
         startBooking, setBookingMode, submitBooking,
         loadMyData, loadMoreBookings, loadMoreFinance,
-        cancelMyBooking, openSubstitute, submitSubstitute,
+        cancelMyBooking, openSubstitute, openAdminSubstitute, submitSubstitute, cancelAdminBooking,
         openProfile, saveProfile,
         openAdminSession, confirmFinance, reopenFinance, openFinanceEdit, saveFinanceEdit,
         settleCurrentSession, openAdminFinance, loadAdminFinance, loadMoreAdminFinance, exportFinanceCsv, createSession
