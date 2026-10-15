@@ -2,911 +2,1482 @@
 <html lang="zh-Hant-TW">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>匹克球球敘預約系統 Prototype</title>
-  <!-- 引入 Google Fonts: Noto Sans TC 與 Montserrat -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#F97316">
+  <title>匹克球球敘</title>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <!-- 引入 Vue 3 與 Tailwind CSS -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Tailwind 品牌色彩與無障礙觸控設定 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script>
     tailwind.config = {
       theme: {
         extend: {
           colors: {
             brand: {
-              orange: '#D9530F',
-              orangeLight: '#FFF3E8',
-              bg: '#FAFAF7',
-              textMain: '#202623',
-              green: '#2D8A56',
-              warning: '#D97706',
-              border: '#E5E7EB'
-            }
+              50: '#FFF7ED',
+              100: '#FFEDD5',
+              500: '#F97316',
+              600: '#EA580C',
+              700: '#C2410C'
+            },
+            ink: '#1F2937',
+            muted: '#6B7280',
+            line: '#E5E7EB',
+            canvas: '#FAFAF8'
+          },
+          boxShadow: {
+            card: '0 8px 28px rgba(31, 41, 55, 0.07)',
+            float: '0 18px 55px rgba(31, 41, 55, 0.16)'
           },
           fontFamily: {
-            sans: ['"Noto Sans TC"', 'sans-serif'],
-            en: ['Montserrat', 'sans-serif']
-          },
-          minHeight: {
-            'touch': '44px'
-          },
-          minWidth: {
-            'touch': '44px'
+            sans: ['"Noto Sans TC"', 'system-ui', 'sans-serif']
           }
         }
       }
     }
   </script>
+
   <style>
-    /* 防止手機端點擊高光與隱藏自訂捲軸 */
-    * { -webkit-tap-highlight-color: transparent; }
-    body { background-color: #e5e5e5; }
-    .hide-scrollbar::-webkit-scrollbar { display: none; }
-    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    /* Vue 過場動畫 */
-    .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+    :root { color-scheme: light; }
+    * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #ECECEA; }
+    body { font-family: "Noto Sans TC", system-ui, sans-serif; color: #1F2937; font-size: 16px; }
+    button, input, textarea, select { font: inherit; }
+    button { min-height: 46px; }
+    .app-scroll::-webkit-scrollbar { display: none; }
+    .app-scroll { scrollbar-width: none; }
+    .data-text { font-size: 15px; line-height: 1.55; }
+    .fade-enter-active, .fade-leave-active { transition: opacity .18s ease; }
     .fade-enter-from, .fade-leave-to { opacity: 0; }
-    .slide-up-enter-active, .slide-up-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-    .slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
+    .sheet-enter-active, .sheet-leave-active { transition: transform .28s cubic-bezier(.16,1,.3,1), opacity .2s ease; }
+    .sheet-enter-from, .sheet-leave-to { transform: translateY(24px); opacity: 0; }
+    .card-enter-active, .card-leave-active { transition: opacity .2s ease, transform .2s ease; }
+    .card-enter-from, .card-leave-to { opacity: 0; transform: translateY(6px); }
+    .safe-bottom { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+    [v-cloak] { display: none; }
   </style>
 </head>
-<body class="font-sans text-brand-textMain antialiased">
+<body>
+<div id="app" v-cloak class="min-h-screen flex justify-center">
+  <div class="w-full max-w-[480px] min-h-screen bg-canvas relative shadow-2xl overflow-hidden">
 
-<div id="app" class="flex justify-center w-full min-h-screen">
-  
-  <!-- ========================================== -->
-  <!-- 左下角切換控制台 (原型預覽專用) -->
-  <!-- ========================================== -->
-  <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 bg-white p-4 rounded-xl shadow-2xl border border-gray-200">
-    <div class="text-xs text-gray-500 font-bold mb-1 text-center tracking-wide">[原型預覽控制]</div>
-    <div class="flex gap-2 bg-gray-100 p-1 rounded-lg">
-      <button @click="switchRole('player')" 
-              :class="currentRole === 'player' ? 'bg-white shadow-sm text-brand-orange font-bold' : 'text-gray-500 hover:bg-gray-200'"
-              class="px-4 py-2 rounded-md text-sm transition-all min-h-touch min-w-touch">
-        手機球友端
-      </button>
-      <button @click="switchRole('admin')" 
-              :class="currentRole === 'admin' ? 'bg-white shadow-sm text-brand-orange font-bold' : 'text-gray-500 hover:bg-gray-200'"
-              class="px-4 py-2 rounded-md text-sm transition-all min-h-touch min-w-touch">
-        桌面管理端
-      </button>
-    </div>
-  </div>
-
-  <!-- ========================================== -->
-  <!-- 角色 1：球友端 (手機模擬器佈局) -->
-  <!-- ========================================== -->
-  <div v-if="currentRole === 'player'" class="w-full max-w-[414px] bg-brand-bg relative h-screen overflow-hidden flex flex-col shadow-2xl shadow-gray-400">
-    
-    <!-- 頂部導覽區 (內頁返回) -->
-    <header v-if="playerCurrentView !== 'home' && playerCurrentView !== 'myRecords'" class="bg-white px-4 h-14 flex items-center justify-between border-b border-brand-border shrink-0 z-10">
-      <button @click="goBack" class="p-2 -ml-2 min-h-touch min-w-touch flex items-center justify-center text-gray-600 active:bg-gray-100 rounded-full transition-colors">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <h1 class="font-bold text-lg">
-        {{ playerCurrentView === 'detail' ? '場次詳情' : playerCurrentView === 'payment' ? '付款與聯絡' : '我的資料' }}
-      </h1>
-      <div class="w-10"></div>
-    </header>
-
-    <!-- 頂部導覽區 (首頁品牌) -->
-    <header v-if="playerCurrentView === 'home' || playerCurrentView === 'myRecords'" class="bg-white px-5 pt-12 pb-4 flex flex-col gap-3 shrink-0 z-10 shadow-sm">
-      <div class="flex justify-between items-center">
-        <div class="flex items-center gap-2 text-brand-orange font-black text-2xl tracking-wide font-en">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20"/><path d="M2 12h20"/></svg>
-          PickleUp
+    <!-- Global loading -->
+    <Transition name="fade">
+      <div v-if="booting" class="absolute inset-0 z-[100] bg-white flex items-center justify-center">
+        <div class="flex flex-col items-center gap-4 text-muted">
+          <div class="w-9 h-9 rounded-full border-[3px] border-brand-100 border-t-brand-500 animate-spin"></div>
+          <span class="font-semibold">載入球敘資料</span>
         </div>
-        <button v-if="playerCurrentView === 'myRecords'" @click="showProfileModal = true" class="text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-full flex items-center gap-1 min-h-[36px] active:bg-gray-200">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          資料
-        </button>
       </div>
-      <div v-if="playerCurrentView === 'home'" class="bg-brand-orangeLight text-brand-orange text-sm p-3 rounded-lg border border-orange-100 font-medium">
-        📢 公告：近期場次皆採人工核款，報名後請至「我的紀錄」查看聯絡方式。
-      </div>
-    </header>
+    </Transition>
 
-    <!-- 主要內容區 -->
-    <main class="flex-1 overflow-y-auto hide-scrollbar pb-24">
-      
-      <!-- [畫面] 首頁 / 場次列表 -->
-      <div v-if="playerCurrentView === 'home'" class="p-4 flex flex-col gap-4">
-        <!-- 簡易篩選 -->
-        <div class="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-          <button v-for="f in filterOptions" :key="f.value" @click="currentFilter = f.value"
-                  :class="currentFilter === f.value ? 'bg-brand-textMain text-white' : 'bg-white text-gray-600 border border-brand-border'"
-                  class="px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap min-h-touch transition-colors">
-            {{ f.label }}
+    <!-- Header -->
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-line">
+      <div class="px-5 pt-[max(16px,env(safe-area-inset-top))] pb-4 flex items-center justify-between gap-3">
+        <button v-if="subView" @click="closeSubView" class="w-11 h-11 min-h-0 rounded-full flex items-center justify-center text-ink hover:bg-gray-100 active:scale-95 transition">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div v-else class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 rounded-xl bg-brand-500 text-white flex items-center justify-center shadow-sm shrink-0">
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 5.2c2 3.1 2.1 10.2 0 13.6"/><path d="M16 5.2c-2 3.1-2.1 10.2 0 13.6"/><path d="M3.7 9.6h16.6"/><path d="M3.7 14.4h16.6"/></svg>
+          </div>
+          <div class="min-w-0">
+            <div class="font-bold text-[21px] leading-tight tracking-tight">匹克球球敘</div>
+            <div class="text-[13px] text-muted mt-0.5">簡單報名・人工核款・紀錄清楚</div>
+          </div>
+        </div>
+
+        <div class="ml-auto flex items-center gap-2">
+          <button v-if="user && !subView" @click="openProfile" class="min-h-0 h-11 px-3 rounded-xl bg-gray-100 text-[15px] font-semibold flex items-center gap-2 hover:bg-gray-200 transition">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span class="max-w-[92px] truncate">{{ profile?.nickname || '我的資料' }}</span>
+          </button>
+          <button v-else-if="!user && !subView" @click="openAuth('login')" class="min-h-0 h-11 px-4 rounded-xl bg-ink text-white text-[15px] font-semibold hover:bg-gray-800 active:scale-[.98] transition">
+            登入
           </button>
         </div>
+      </div>
+    </header>
 
-        <!-- 場次卡片列表 -->
-        <div class="flex flex-col gap-4 mt-2">
-          <div v-for="session in filteredSessions" :key="session.id" 
-               class="bg-white rounded-xl p-4 border border-brand-border shadow-sm flex flex-col gap-3 relative overflow-hidden">
-            <div class="absolute top-4 right-4 text-xs font-bold px-2 py-1 rounded-md" :class="sessionStatusClass(session)">
-              {{ sessionStatusText(session) }}
-            </div>
-            
-            <div class="text-xs text-gray-500 font-en font-semibold">{{ session.date }} {{ session.day }}</div>
-            <h2 class="text-lg font-bold leading-tight pr-16">{{ session.name }}</h2>
-            
-            <div class="flex gap-2 flex-wrap">
-              <span v-for="tag in session.tags" :key="tag" class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">{{ tag }}</span>
-            </div>
+    <!-- Main content -->
+    <main class="app-scroll overflow-y-auto" :class="subView ? 'pb-8' : 'pb-28'" style="height: calc(100vh - 78px);">
 
-            <div class="text-sm text-gray-700 flex flex-col gap-1.5 mt-1 font-medium">
-              <div class="flex items-center gap-2 text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> <span class="font-en">{{ session.time }}</span></div>
-              <div class="flex items-center gap-2 text-gray-600"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> {{ session.venue }}</div>
-              <div class="flex items-center gap-2 text-brand-orange"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg> <span class="font-en font-bold">NT$ {{ session.price }}</span></div>
+      <!-- Session detail -->
+      <Transition name="card" mode="out-in">
+        <section v-if="subView === 'session' && selectedSession" key="session-detail" class="px-4 py-5">
+          <div class="bg-white rounded-[22px] border border-brand-100 shadow-card overflow-hidden">
+            <div class="aspect-[16/9] bg-brand-50 overflow-hidden border-b border-brand-100">
+              <img :src="SESSION_PLACEHOLDER_IMAGE" alt="球敘場次示意圖" class="w-full h-full object-cover">
             </div>
-
-            <div class="mt-2">
-              <div class="flex justify-between text-xs font-bold mb-1 text-gray-500">
-                <span>報名進度</span>
-                <span><span class="text-brand-textMain font-en">{{ session.registered }}</span> / {{ session.capacity }}</span>
+            <div class="p-5 border-b border-brand-100">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <div class="text-[14px] font-bold text-brand-600 mb-2">{{ selectedSession.category }}</div>
+                  <h1 class="text-[26px] font-bold tracking-tight leading-tight">{{ formatDateLong(selectedSession.start_at) }}</h1>
+                  <div class="text-[18px] font-semibold mt-1">{{ formatTimeRange(selectedSession.start_at, selectedSession.end_at) }}</div>
+                </div>
+                <span class="shrink-0 rounded-full px-3 py-1.5 text-[13px] font-bold" :class="sessionStatusClass(selectedSession)">{{ sessionStatusText(selectedSession) }}</span>
               </div>
-              <div class="w-full bg-gray-100 rounded-full h-1.5">
-                <div class="h-1.5 rounded-full transition-all duration-500" 
-                     :class="session.registered >= session.capacity ? 'bg-brand-warning' : 'bg-brand-orange'"
-                     :style="{ width: Math.min((session.registered / session.capacity) * 100, 100) + '%' }"></div>
+
+              <div class="mt-5 grid gap-3 data-text">
+                <div class="flex items-center gap-3 text-gray-700">
+                  <div class="w-9 h-9 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  </div>
+                  <span class="font-medium">{{ selectedSession.venue }}</span>
+                </div>
+                <div class="flex items-center gap-3 text-gray-700">
+                  <div class="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 shrink-0">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+                  </div>
+                  <span class="font-semibold text-brand-700">單次 NT$ {{ money(selectedSession.default_price) }}</span>
+                </div>
               </div>
             </div>
 
-            <button @click="viewDetail(session)" class="mt-2 w-full bg-brand-bg text-brand-textMain border border-gray-200 font-bold py-3 rounded-lg min-h-touch active:bg-gray-100 transition-colors">
-              查看場次
+            <div class="p-5">
+              <div class="flex justify-between items-end mb-2">
+                <div>
+                  <div class="font-bold">報名進度</div>
+                  <div class="text-[14px] text-muted mt-1">剩餘 {{ selectedSession.remaining_spots }} 個名額</div>
+                </div>
+                <div class="font-bold text-[17px]">{{ selectedSession.registered_count }} / {{ selectedSession.capacity }}</div>
+              </div>
+              <div class="w-full h-2.5 rounded-full bg-gray-100 overflow-hidden">
+                <div class="h-full rounded-full bg-brand-500 transition-all duration-500" :style="{ width: sessionProgress(selectedSession) + '%' }"></div>
+              </div>
+
+              <div v-if="selectedSession.public_note" class="mt-5 rounded-2xl bg-brand-50 border border-brand-100 p-4">
+                <div class="flex items-center gap-2 font-bold text-brand-700 mb-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  場次備註
+                </div>
+                <p class="m-0 leading-7 text-gray-700 whitespace-pre-line">{{ selectedSession.public_note }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 bg-white rounded-[22px] border border-line shadow-card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="font-bold text-[19px]">目前名單</h2>
+              <span class="data-text text-muted">{{ publicRoster.length }} 人</span>
+            </div>
+            <div v-if="rosterLoading" class="py-8 text-center text-muted">載入名單中…</div>
+            <div v-else-if="publicRoster.length === 0" class="py-8 text-center text-muted">目前尚無報名</div>
+            <div v-else class="divide-y divide-gray-100">
+              <div v-for="(row, index) in publicRoster" :key="row.booking_id" class="py-3 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-[14px] font-bold">{{ index + 1 }}</div>
+                <div class="font-semibold flex-1 min-w-0 truncate">{{ row.nickname }}</div>
+                <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.payment_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">
+                  {{ row.payment_status === 'confirmed' ? '已收款' : '待確認' }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 bg-[#FFF9F3] rounded-[22px] border border-brand-100 p-5 data-text">
+            <div class="flex justify-between gap-5 py-2"><span class="text-muted">報名截止</span><span class="font-semibold text-right">{{ formatDeadline(selectedSession.registration_deadline) }}</span></div>
+            <div class="flex justify-between gap-5 py-2"><span class="text-muted">取消截止</span><span class="font-semibold text-right">{{ formatDeadline(selectedSession.cancel_deadline) }}</span></div>
+          </div>
+
+          <div class="mt-5">
+            <button v-if="canBookSelectedSession" @click="startBooking(selectedSession)" class="w-full rounded-2xl bg-brand-500 text-white font-bold text-[17px] py-3.5 shadow-lg shadow-orange-100 hover:bg-brand-600 active:scale-[.99] transition">立即報名</button>
+            <button v-else-if="selectedSession.status === 'open' && selectedSession.remaining_spots <= 0" disabled class="w-full rounded-2xl bg-gray-200 text-gray-500 font-bold text-[17px] py-3.5">名額已滿</button>
+            <button v-else disabled class="w-full rounded-2xl bg-gray-200 text-gray-500 font-bold text-[17px] py-3.5">此場次已停止報名</button>
+          </div>
+        </section>
+
+        <!-- Admin session detail -->
+        <section v-else-if="subView === 'adminSession' && adminSelectedSession" key="admin-detail" class="px-4 py-5">
+          <div class="bg-white rounded-[22px] border border-line shadow-card p-5">
+            <div class="flex justify-between gap-4 items-start">
+              <div>
+                <div class="text-[14px] font-bold text-brand-600 mb-1">{{ adminSelectedSession.category }}</div>
+                <h1 class="text-[24px] font-bold leading-tight">{{ formatDateLong(adminSelectedSession.start_at) }}</h1>
+                <div class="text-[17px] font-semibold mt-1">{{ formatTimeRange(adminSelectedSession.start_at, adminSelectedSession.end_at) }}</div>
+                <div class="text-muted mt-2">{{ adminSelectedSession.venue }}</div>
+              </div>
+              <span class="rounded-full px-3 py-1.5 text-[13px] font-bold" :class="adminSelectedSession.status === 'settled' ? 'bg-gray-100 text-gray-600' : 'bg-brand-50 text-brand-700'">{{ sessionDbStatusText(adminSelectedSession.status) }}</span>
+            </div>
+
+            <div class="mt-5 grid grid-cols-3 gap-2">
+              <div class="rounded-2xl bg-gray-50 p-3 text-center">
+                <div class="text-[13px] text-muted">報名</div>
+                <div class="font-bold text-[20px] mt-1">{{ adminSelectedSession.registered_count }}</div>
+              </div>
+              <div class="rounded-2xl bg-amber-50 p-3 text-center">
+                <div class="text-[13px] text-amber-700">待核款</div>
+                <div class="font-bold text-[20px] text-amber-700 mt-1">{{ adminSelectedSession.pending_count }}</div>
+              </div>
+              <div class="rounded-2xl bg-emerald-50 p-3 text-center">
+                <div class="text-[13px] text-emerald-700">已確認</div>
+                <div class="font-bold text-[20px] text-emerald-700 mt-1">{{ adminSelectedSession.confirmed_count }}</div>
+              </div>
+            </div>
+
+            <div v-if="adminSelectedSession.internal_note" class="mt-4 rounded-2xl bg-gray-50 border border-gray-100 p-4 data-text">
+              <div class="font-bold mb-1">內部備註</div>
+              <div class="text-gray-600 whitespace-pre-line">{{ adminSelectedSession.internal_note }}</div>
+            </div>
+
+            <button v-if="adminSelectedSession.status === 'open'" @click="settleCurrentSession" :disabled="adminSelectedSession.pending_count > 0 || adminActionLoading" class="mt-5 w-full rounded-xl py-3 font-bold transition" :class="adminSelectedSession.pending_count === 0 ? 'bg-ink text-white' : 'bg-gray-200 text-gray-500'">
+              {{ adminSelectedSession.pending_count > 0 ? `尚有 ${adminSelectedSession.pending_count} 筆待確認` : '完成本場結算' }}
             </button>
           </div>
-          <div v-if="filteredSessions.length === 0" class="text-center text-gray-400 py-10">目前無符合狀態的場次</div>
-        </div>
-      </div>
 
-      <!-- [畫面] 場次詳情與報名 -->
-      <div v-if="playerCurrentView === 'detail' && selectedSession" class="flex flex-col">
-        <div class="p-5 flex flex-col gap-4">
-          <div>
-            <div class="text-sm text-brand-orange font-bold font-en mb-1">{{ selectedSession.date }} {{ selectedSession.day }}</div>
-            <h2 class="text-2xl font-bold leading-tight">{{ selectedSession.name }}</h2>
-          </div>
+          <div class="mt-4 bg-white rounded-[22px] border border-line shadow-card overflow-hidden">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+              <h2 class="font-bold text-[19px]">報名名單</h2>
+              <span class="data-text text-muted">{{ adminRoster.length }} 筆</span>
+            </div>
+            <div v-if="adminRosterLoading" class="p-8 text-center text-muted">載入名單中…</div>
+            <div v-else-if="adminRoster.length === 0" class="p-8 text-center text-muted">目前沒有報名</div>
+            <div v-else class="divide-y divide-gray-100">
+              <div v-for="row in adminRoster" :key="row.booking_id" class="p-5">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="min-w-0">
+                    <div class="font-bold text-[17px] flex items-center gap-2 flex-wrap">
+                      <span>{{ row.nickname }}</span>
+                      <span v-if="row.has_dupr" class="text-[12px] rounded-full bg-gray-100 text-gray-600 px-2 py-0.5">DUPR</span>
+                    </div>
+                    <div class="data-text text-muted mt-1">{{ row.phone }}</div>
+                    <div v-if="row.original_player !== row.nickname" class="text-[14px] text-muted mt-1">原報名：{{ row.original_player }}</div>
+                    <div v-if="row.booked_by" class="text-[14px] text-muted mt-1">操作報名：{{ row.booked_by }}</div>
+                  </div>
+                  <span class="shrink-0 text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.financial_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">
+                    {{ row.financial_status === 'confirmed' ? '已收款' : '待確認' }}
+                  </span>
+                </div>
 
-          <div class="flex gap-2 flex-wrap">
-            <span v-for="tag in selectedSession.tags" :key="tag" class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded font-bold">{{ tag }}</span>
-          </div>
+                <div class="mt-4 rounded-2xl bg-gray-50 p-4 data-text">
+                  <div class="flex justify-between gap-4">
+                    <span class="text-muted">金額</span>
+                    <span class="font-semibold">NT$ {{ money(row.amount || 0) }}</span>
+                  </div>
+                  <div class="flex justify-between gap-4 mt-2">
+                    <span class="text-muted">套票次數</span>
+                    <span class="font-semibold">{{ signedUnits(row.package_delta || 0) }}</span>
+                  </div>
+                  <div v-if="row.operator" class="flex justify-between gap-4 mt-2">
+                    <span class="text-muted">操作者</span>
+                    <span class="font-semibold text-right">{{ row.operator }}</span>
+                  </div>
+                  <div v-if="row.financial_note" class="flex justify-between gap-4 mt-2">
+                    <span class="text-muted">備註</span>
+                    <span class="font-medium text-right">{{ row.financial_note }}</span>
+                  </div>
+                </div>
 
-          <div class="bg-white p-4 rounded-xl border border-brand-border flex flex-col gap-3 text-sm">
-            <div class="flex justify-between border-b border-gray-100 pb-2">
-              <span class="text-gray-500">固定時段</span><span class="font-bold font-en">{{ selectedSession.time }}</span>
-            </div>
-            <div class="flex justify-between border-b border-gray-100 pb-2">
-              <span class="text-gray-500">場館地點</span><span class="font-bold">{{ selectedSession.venue }}</span>
-            </div>
-            <div class="flex justify-between border-b border-gray-100 pb-2">
-              <span class="text-gray-500">固定費用</span><span class="font-bold font-en text-brand-orange">NT$ {{ selectedSession.price }}</span>
-            </div>
-            <div class="flex justify-between border-b border-gray-100 pb-2">
-              <span class="text-gray-500">名額狀態</span>
-              <span class="font-bold" :class="selectedSession.registered >= selectedSession.capacity ? 'text-brand-warning' : 'text-brand-green'">
-                {{ selectedSession.registered }} / {{ selectedSession.capacity }} 人
-              </span>
-            </div>
-            <div class="flex justify-between border-b border-gray-100 pb-2">
-              <span class="text-gray-500">報名截止</span><span class="font-en">{{ selectedSession.deadline }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span class="text-gray-500">取消截止</span><span class="font-en">{{ selectedSession.cancelDeadline }}</span>
-            </div>
-          </div>
-
-          <div class="bg-brand-orangeLight/50 p-4 rounded-xl border border-orange-100 text-sm flex flex-col gap-2">
-            <div class="font-bold text-brand-orange flex items-center gap-1">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              場次備註與規則
-            </div>
-            <p class="text-gray-700 leading-relaxed whitespace-pre-line">{{ selectedSession.publicNote }}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- [畫面] 我的紀錄 -->
-      <div v-if="playerCurrentView === 'myRecords'" class="p-4 flex flex-col gap-4">
-        <h2 class="text-xl font-bold mb-2">報名紀錄</h2>
-        <div v-if="myBookingsList.length === 0" class="text-center py-12 text-gray-400 bg-white rounded-xl border border-gray-100">
-          <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-3 text-gray-300" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-          暫無報名紀錄
-        </div>
-        
-        <div v-for="b in myBookingsList" :key="b.id" class="bg-white rounded-xl border border-brand-border shadow-sm overflow-hidden flex flex-col">
-          <div class="p-4 border-b border-gray-50 relative">
-            <div class="text-xs text-gray-500 font-en mb-1">{{ b.session.date }}</div>
-            <h3 class="font-bold text-lg pr-16">{{ b.session.name }}</h3>
-            <div class="text-sm mt-1 text-gray-600"><span class="font-en">{{ b.session.time }}</span></div>
-            <div class="absolute top-4 right-4 px-2 py-1 rounded text-xs font-bold" :class="bookingStatusStyle(b.status)">
-              {{ bookingStatusText(b.status) }}
+                <div v-if="adminSelectedSession.status === 'open' && row.booking_status === 'active'" class="mt-3 flex gap-2">
+                  <button v-if="row.financial_status === 'pending'" @click="confirmFinance(row)" class="flex-1 rounded-xl bg-brand-500 text-white font-bold py-2.5">確認收款</button>
+                  <button v-if="row.financial_status === 'pending'" @click="openFinanceEdit(row)" class="rounded-xl border border-line bg-white px-4 font-bold text-gray-700">調整</button>
+                  <button v-if="row.financial_status === 'confirmed'" @click="reopenFinance(row)" class="w-full rounded-xl border border-line bg-white text-gray-700 font-bold py-2.5">改回待確認</button>
+                </div>
+              </div>
             </div>
           </div>
-          
-          <div class="p-4 bg-gray-50/50 flex flex-col gap-3 text-sm">
-            <div v-if="b.status === 'registered' || b.status === 'paid'" class="flex items-center justify-between bg-white p-3 rounded border border-gray-100">
-              <span class="text-gray-500">收款狀態</span>
-              <span class="font-bold flex items-center gap-1" :class="b.paymentStatus === 'paid' ? 'text-brand-green' : 'text-brand-warning'">
-                <svg v-if="b.paymentStatus === 'paid'" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                {{ b.paymentStatus === 'paid' ? '已付款' : '未確認收款' }}
-              </span>
+        </section>
+
+        <!-- Primary views -->
+        <section v-else key="primary">
+          <!-- HOME -->
+          <div v-if="activeTab === 'home'" class="px-4 py-5">
+            <div class="rounded-[22px] bg-gradient-to-br from-brand-500 to-brand-700 text-white p-5 shadow-card">
+              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2.5 py-1 text-[13px] font-bold tracking-wide">v1.0.1</span>
+              <h1 class="text-[27px] font-bold leading-tight mt-3">近期球敘</h1>
             </div>
-            
-            <div v-if="b.status === 'waitlisted'" class="text-brand-warning font-bold flex items-center gap-1 bg-amber-50 p-3 rounded border border-amber-100">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              候補順位：{{ b.waitlistPosition }}
-            </div>
-            <div v-if="b.status === 'sub_pending'" class="text-brand-warning font-bold bg-amber-50 p-3 rounded border border-amber-100">
-              交接給：{{ b.subName }} (待主辦方確認)
-            </div>
-            <div v-if="b.status === 'substituted'" class="text-gray-500 font-bold bg-gray-100 p-3 rounded border border-gray-200">
-              已由「{{ b.subName }}」承接此名額
-            </div>
-            
-            <!-- 操作按鈕區 -->
-            <div class="flex gap-2 mt-2 pt-2">
-              <button v-if="b.status === 'registered' || b.status === 'paid'" @click="openSubModal(b)" class="flex-1 bg-white border border-gray-300 text-brand-textMain font-bold py-2 rounded-lg min-h-touch active:bg-gray-100 transition-colors">
-                提議代打
-              </button>
-              <button v-if="b.status === 'registered' || b.status === 'paid' || b.status === 'waitlisted'" @click="cancelBooking(b)" class="flex-1 bg-white border border-red-200 text-red-600 font-bold py-2 rounded-lg min-h-touch active:bg-red-50 transition-colors">
-                {{ b.status === 'waitlisted' ? '退出候補' : '取消報名' }}
-              </button>
-              <button @click="playerCurrentView = 'payment'" class="flex-1 bg-brand-textMain text-white font-bold py-2 rounded-lg min-h-touch active:bg-gray-700 transition-colors">
-                聯絡付款
-              </button>
+
+            <div v-if="sessionsLoading" class="py-14 flex justify-center"><div class="w-8 h-8 rounded-full border-[3px] border-brand-100 border-t-brand-500 animate-spin"></div></div>
+            <div v-else class="mt-4 flex flex-col gap-4">
+              <article v-for="session in filteredPublicSessions" :key="session.id" class="bg-white rounded-[22px] border border-line shadow-card overflow-hidden">
+                <div class="aspect-[16/9] bg-brand-50 overflow-hidden border-b border-brand-100">
+                  <img :src="SESSION_PLACEHOLDER_IMAGE" alt="球敘場次示意圖" class="w-full h-full object-cover">
+                </div>
+                <div class="p-5">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <div class="text-[14px] font-bold text-brand-600 mb-1">{{ session.category }}</div>
+                    <div class="text-[22px] font-bold tracking-tight">{{ formatDateShort(session.start_at) }}</div>
+                    <div class="text-[17px] font-semibold mt-1">{{ formatTimeRange(session.start_at, session.end_at) }}</div>
+                  </div>
+                  <span class="text-[13px] font-bold rounded-full px-3 py-1.5" :class="sessionStatusClass(session)">{{ sessionStatusText(session) }}</span>
+                </div>
+
+                <div class="mt-4 data-text text-gray-600 flex flex-col gap-2">
+                  <div class="flex items-center gap-2">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <span>{{ session.venue }}</span>
+                  </div>
+                  <div class="flex items-center gap-2 text-brand-700 font-semibold">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+                    <span>NT$ {{ money(session.default_price) }}</span>
+                  </div>
+                </div>
+
+                <div class="mt-4">
+                  <div class="flex justify-between items-center data-text mb-2">
+                    <span class="text-muted">{{ session.status === 'open' ? `剩 ${session.remaining_spots} 個名額` : '最終名單' }}</span>
+                    <span class="font-bold">{{ session.registered_count }} / {{ session.capacity }}</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
+                    <div class="h-full rounded-full bg-brand-500" :style="{ width: sessionProgress(session) + '%' }"></div>
+                  </div>
+                </div>
+
+                <button @click="viewSession(session)" class="mt-5 w-full rounded-xl bg-brand-50 border border-brand-100 font-bold py-2.5 text-brand-700 hover:bg-brand-100 transition">查看場次與名單</button>
+                </div>
+              </article>
+
+              <div v-if="filteredPublicSessions.length === 0" class="rounded-[22px] border border-dashed border-gray-300 bg-white p-10 text-center text-muted">
+                目前沒有符合條件的場次
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- [畫面] 付款與聯絡 -->
-      <div v-if="playerCurrentView === 'payment'" class="p-5 flex flex-col gap-5">
-        <div class="bg-white p-5 rounded-xl border border-brand-border flex flex-col gap-3 shadow-sm">
-          <h3 class="font-bold text-lg border-b border-gray-100 pb-2 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" class="text-gray-500" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-            付款說明
-          </h3>
-          <p class="text-gray-500 text-sm py-4 text-center bg-gray-50 rounded border border-gray-100">待主辦者設定匯款帳戶或付款連結</p>
-          <div class="text-xs text-brand-warning bg-orange-50 p-3 rounded border border-orange-100 leading-relaxed font-bold">
-            💡 提醒：付款後由主辦者人工確認。確認後會在「我的報名」顯示已付款，無需填寫帳號末五碼或上傳截圖。
+          <!-- MY RECORDS -->
+          <div v-else-if="activeTab === 'records'" class="px-4 py-5">
+            <div v-if="!user" class="bg-white rounded-[22px] border border-line shadow-card p-6 text-center">
+              <div class="w-14 h-14 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <h2 class="text-[22px] font-bold mt-4">登入後查看你的紀錄</h2>
+              <p class="text-muted leading-7 mt-2">包含報名、付款狀態、套票餘額與歷史紀錄。</p>
+              <button @click="openAuth('login')" class="mt-5 w-full rounded-xl bg-brand-500 text-white font-bold py-3">手機＋密碼登入</button>
+              <button @click="openAuth('register')" class="mt-2 w-full rounded-xl border border-line bg-white font-bold py-3">建立帳號</button>
+            </div>
+
+            <template v-else>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="rounded-[20px] bg-ink text-white p-5 shadow-card">
+                  <div class="text-[13px] text-gray-300">目前套票餘額</div>
+                  <div class="text-[30px] font-bold mt-1">{{ packageBalance }} <span class="text-[15px] font-medium">次</span></div>
+                </div>
+                <div class="rounded-[20px] bg-white border border-line p-5 shadow-card">
+                  <div class="text-[13px] text-muted">目前帳號</div>
+                  <div class="text-[18px] font-bold mt-1 truncate">{{ profile?.nickname }}</div>
+                  <div class="text-[14px] text-muted mt-1">{{ profile?.phone }}</div>
+                </div>
+              </div>
+
+              <div class="mt-5 bg-gray-100 p-1 rounded-xl flex">
+                <button @click="recordsMode = 'bookings'" class="flex-1 min-h-0 h-11 rounded-lg font-bold text-[15px] transition" :class="recordsMode === 'bookings' ? 'bg-white shadow-sm text-ink' : 'text-muted'">報名紀錄</button>
+                <button @click="recordsMode = 'finance'" class="flex-1 min-h-0 h-11 rounded-lg font-bold text-[15px] transition" :class="recordsMode === 'finance' ? 'bg-white shadow-sm text-ink' : 'text-muted'">套票與收支</button>
+              </div>
+
+              <div v-if="recordsLoading" class="py-14 flex justify-center"><div class="w-8 h-8 rounded-full border-[3px] border-brand-100 border-t-brand-500 animate-spin"></div></div>
+
+              <div v-else-if="recordsMode === 'bookings'" class="mt-4 flex flex-col gap-4">
+                <article v-for="row in myBookings" :key="row.booking_id" class="bg-white rounded-[22px] border border-line shadow-card p-5">
+                  <div class="flex items-start justify-between gap-4">
+                    <div>
+                      <div class="text-[14px] font-bold text-brand-600">{{ row.category }}</div>
+                      <div class="font-bold text-[20px] mt-1">{{ formatDateShort(row.start_at) }}</div>
+                      <div class="text-[16px] font-semibold mt-1">{{ formatTimeRange(row.start_at, row.end_at) }}</div>
+                    </div>
+                    <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.payment_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">{{ row.payment_status === 'confirmed' ? '已收款' : '待確認' }}</span>
+                  </div>
+                  <div class="data-text text-muted mt-3">{{ row.venue }}</div>
+                  <div v-if="!row.is_my_participation" class="mt-3 rounded-xl bg-brand-50 px-3 py-2 data-text text-brand-700 font-semibold">代報參加者：{{ row.participant_nickname }}</div>
+
+                  <div class="mt-4 rounded-2xl bg-gray-50 p-4 data-text">
+                    <div class="flex justify-between"><span class="text-muted">金額</span><span class="font-semibold">NT$ {{ money(row.amount || 0) }}</span></div>
+                    <div class="flex justify-between mt-2"><span class="text-muted">套票</span><span class="font-semibold">{{ signedUnits(row.package_delta || 0) }}</span></div>
+                    <div class="flex justify-between mt-2"><span class="text-muted">場次狀態</span><span class="font-semibold">{{ sessionDbStatusText(row.session_status) }}</span></div>
+                  </div>
+
+                  <div v-if="row.can_manage" class="mt-3 flex gap-2">
+                    <button @click="openSubstitute(row)" class="flex-1 rounded-xl border border-line font-bold py-2.5">更換參加者</button>
+                    <button @click="cancelMyBooking(row)" class="flex-1 rounded-xl border border-red-200 text-red-600 font-bold py-2.5">取消報名</button>
+                  </div>
+                </article>
+                <div v-if="myBookings.length === 0" class="rounded-[22px] border border-dashed border-gray-300 bg-white p-10 text-center text-muted">目前沒有報名紀錄</div>
+                <button v-if="myBookingsHasMore" @click="loadMoreBookings" class="w-full rounded-xl border border-line bg-white font-bold py-3">更多歷史紀錄</button>
+              </div>
+
+              <div v-else class="mt-4 flex flex-col gap-3">
+                <article v-for="row in myFinance" :key="row.entry_id" class="bg-white rounded-[20px] border border-line shadow-card p-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <div class="font-bold">{{ row.note || '財務紀錄' }}</div>
+                      <div class="text-[14px] text-muted mt-1">{{ formatDateTime(row.created_at) }}<span v-if="row.venue"> · {{ row.venue }}</span></div>
+                    </div>
+                    <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">{{ row.status === 'confirmed' ? '已確認' : '待確認' }}</span>
+                  </div>
+                  <div class="mt-4 grid grid-cols-3 gap-2 data-text">
+                    <div class="rounded-xl bg-gray-50 p-3"><div class="text-[12px] text-muted">金額</div><div class="font-bold mt-1">{{ row.amount ? `NT$ ${money(row.amount)}` : '—' }}</div></div>
+                    <div class="rounded-xl bg-gray-50 p-3"><div class="text-[12px] text-muted">套票</div><div class="font-bold mt-1">{{ row.package_delta ? signedUnits(row.package_delta) : '—' }}</div></div>
+                    <div class="rounded-xl bg-gray-50 p-3"><div class="text-[12px] text-muted">餘額</div><div class="font-bold mt-1">{{ row.package_balance_after ?? '—' }}</div></div>
+                  </div>
+                </article>
+                <div v-if="myFinance.length === 0" class="rounded-[22px] border border-dashed border-gray-300 bg-white p-10 text-center text-muted">目前沒有財務紀錄</div>
+                <button v-if="myFinanceHasMore" @click="loadMoreFinance" class="w-full rounded-xl border border-line bg-white font-bold py-3">更多歷史紀錄</button>
+              </div>
+
+              <div class="mt-6 pt-5 border-t-2 border-brand-100">
+                <div class="flex items-start gap-3">
+                  <div class="w-10 h-10 rounded-xl bg-brand-50 border border-brand-100 text-brand-600 flex items-center justify-center shrink-0">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+                  </div>
+                  <div>
+                    <div class="font-bold text-[18px]">付款與聯絡</div>
+                    <p class="text-muted leading-7 mt-1 mb-0">付款後由主辦方人工核對。匯款帳戶、LINE Pay 與聯絡連結將由主辦方於正式上線前設定。</p>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
-        </div>
-        <div class="bg-white p-5 rounded-xl border border-brand-border flex flex-col gap-3 shadow-sm">
-          <h3 class="font-bold text-lg border-b border-gray-100 pb-2">聯絡我們</h3>
-          <button class="w-full bg-[#06C755] text-white font-bold py-3 rounded-lg min-h-touch flex items-center justify-center gap-2 active:bg-green-600 transition-colors">
-            加入主辦方 LINE 聯繫
-          </button>
-          <p class="text-gray-500 text-sm italic text-center mt-1">連結待主辦者設定</p>
-        </div>
-      </div>
 
+          <!-- ADMIN -->
+          <div v-else-if="activeTab === 'admin'" class="px-4 py-5">
+            <div v-if="profile?.role !== 'admin'" class="bg-white rounded-[22px] border border-line p-8 text-center text-muted">此帳號沒有管理員權限</div>
+            <template v-else>
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-[14px] font-bold text-brand-600">ADMIN</div>
+                  <h1 class="text-[25px] font-bold mt-1">管理中心</h1>
+                </div>
+                <button v-if="adminMode === 'sessions'" @click="showCreateSession = true" class="min-h-0 h-11 px-4 rounded-xl bg-brand-500 text-white font-bold text-[15px] flex items-center gap-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                  新增場次
+                </button>
+              </div>
+
+              <div class="mt-5 bg-gray-100 p-1 rounded-xl flex">
+                <button @click="adminMode = 'sessions'" class="flex-1 min-h-0 h-11 rounded-lg font-bold text-[15px]" :class="adminMode === 'sessions' ? 'bg-white shadow-sm' : 'text-muted'">場次與名單</button>
+                <button @click="openAdminFinance" class="flex-1 min-h-0 h-11 rounded-lg font-bold text-[15px]" :class="adminMode === 'finance' ? 'bg-white shadow-sm' : 'text-muted'">財務紀錄</button>
+              </div>
+
+              <div v-if="adminMode === 'sessions'" class="mt-4 flex flex-col gap-4">
+                <article v-for="session in adminSessions" :key="session.session_id" class="bg-white rounded-[22px] border border-line shadow-card p-5">
+                  <div class="flex justify-between gap-4 items-start">
+                    <div>
+                      <div class="text-[14px] font-bold text-brand-600">{{ session.category }}</div>
+                      <div class="font-bold text-[21px] mt-1">{{ formatDateShort(session.start_at) }}</div>
+                      <div class="font-semibold mt-1">{{ formatTimeRange(session.start_at, session.end_at) }}</div>
+                      <div class="data-text text-muted mt-2">{{ session.venue }}</div>
+                    </div>
+                    <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="session.status === 'settled' ? 'bg-gray-100 text-gray-600' : 'bg-brand-50 text-brand-700'">{{ sessionDbStatusText(session.status) }}</span>
+                  </div>
+                  <div class="mt-4 grid grid-cols-3 gap-2 data-text">
+                    <div class="rounded-xl bg-gray-50 p-3 text-center"><div class="text-[12px] text-muted">報名</div><div class="font-bold mt-1">{{ session.registered_count }}/{{ session.capacity }}</div></div>
+                    <div class="rounded-xl bg-amber-50 p-3 text-center"><div class="text-[12px] text-amber-700">待核</div><div class="font-bold text-amber-700 mt-1">{{ session.pending_count }}</div></div>
+                    <div class="rounded-xl bg-emerald-50 p-3 text-center"><div class="text-[12px] text-emerald-700">已確認</div><div class="font-bold text-emerald-700 mt-1">{{ session.confirmed_count }}</div></div>
+                  </div>
+                  <button @click="openAdminSession(session)" class="mt-4 w-full rounded-xl border border-line bg-white font-bold py-2.5">檢視與處理名單</button>
+                </article>
+                <div v-if="adminSessions.length === 0" class="rounded-[22px] border border-dashed border-gray-300 bg-white p-10 text-center text-muted">目前沒有場次</div>
+              </div>
+
+              <div v-else class="mt-4">
+                <div class="bg-white rounded-[22px] border border-line shadow-card p-4">
+                  <label class="block font-bold mb-2">搜尋球友</label>
+                  <input v-model.trim="financeFilter.search" @keyup.enter="loadAdminFinance(true)" type="text" placeholder="暱稱、手機或帳號" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100">
+                  <div class="grid grid-cols-2 gap-2 mt-3">
+                    <div><label class="text-[13px] text-muted">起始日期</label><input v-model="financeFilter.from" type="date" class="mt-1 w-full h-11 rounded-xl border border-line px-3 data-text"></div>
+                    <div><label class="text-[13px] text-muted">結束日期</label><input v-model="financeFilter.to" type="date" class="mt-1 w-full h-11 rounded-xl border border-line px-3 data-text"></div>
+                  </div>
+                  <div class="flex gap-2 mt-3">
+                    <button @click="loadAdminFinance(true)" class="flex-1 rounded-xl bg-ink text-white font-bold py-2.5">套用篩選</button>
+                    <button @click="exportFinanceCsv" class="rounded-xl border border-line px-4 font-bold flex items-center gap-2">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+                      CSV
+                    </button>
+                  </div>
+                </div>
+
+                <div class="mt-4 bg-white rounded-[18px] border border-line overflow-hidden">
+                  <div class="px-4 py-3 border-b border-line flex items-center justify-between gap-3">
+                    <div class="font-bold">財務紀錄</div>
+                    <div class="text-[13px] text-muted">最新 {{ adminFinance.length }} 筆</div>
+                  </div>
+                  <div v-if="adminFinance.length" class="overflow-x-auto app-scroll">
+                    <table class="w-full min-w-[860px] text-left text-[15px]">
+                      <thead class="bg-[#FFF9F3] text-gray-600 border-b border-brand-100">
+                        <tr>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap">日期</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap">球友</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">套票餘額</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">金額</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">套票次數</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap">狀態</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap">操作者</th>
+                          <th class="px-3 py-3 font-semibold min-w-[180px]">備註</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-100">
+                        <tr v-for="row in adminFinance" :key="row.entry_id" class="align-top hover:bg-orange-50/40 transition-colors">
+                          <td class="px-3 py-3 whitespace-nowrap text-gray-600">{{ formatDateTime(row.created_at) }}</td>
+                          <td class="px-3 py-3">
+                            <div class="font-semibold">{{ row.nickname }}</div>
+                            <div class="text-[13px] text-muted mt-0.5">{{ row.phone }}</div>
+                          </td>
+                          <td class="px-3 py-3 text-right font-medium">{{ row.package_balance_after ?? '—' }}</td>
+                          <td class="px-3 py-3 text-right font-bold text-ink whitespace-nowrap">NT$ {{ money(row.amount || 0) }}</td>
+                          <td class="px-3 py-3 text-right font-medium">{{ signedUnits(row.package_delta) }}</td>
+                          <td class="px-3 py-3 whitespace-nowrap">{{ row.status === 'confirmed' ? '已確認' : '待確認' }}</td>
+                          <td class="px-3 py-3 whitespace-nowrap">{{ row.operator || '—' }}</td>
+                          <td class="px-3 py-3 text-gray-600">{{ row.note || '—' }}<span v-if="row.venue"> · {{ row.venue }}</span></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div v-else class="p-10 text-center text-muted">沒有符合條件的財務紀錄</div>
+                </div>
+                <button v-if="adminFinanceHasMore" @click="loadMoreAdminFinance" class="mt-3 w-full rounded-xl border border-line bg-white font-bold py-3">載入更多</button>
+              </div>
+            </template>
+          </div>
+        </section>
+      </Transition>
     </main>
 
-    <!-- 底部導覽列 -->
-    <nav class="bg-white border-t border-brand-border flex h-16 shrink-0 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20 absolute bottom-0 w-full">
-      <button @click="playerCurrentView = 'home'" class="flex-1 flex flex-col items-center justify-center gap-1 min-h-touch transition-colors" :class="playerCurrentView === 'home' ? 'text-brand-orange' : 'text-gray-400'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        <span class="text-[10px] font-bold">首頁</span>
-      </button>
-      <button @click="playerCurrentView = 'myRecords'" class="flex-1 flex flex-col items-center justify-center gap-1 min-h-touch transition-colors" :class="playerCurrentView === 'myRecords' ? 'text-brand-orange' : 'text-gray-400'">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        <span class="text-[10px] font-bold">我的紀錄</span>
-      </button>
+    <!-- Bottom nav -->
+    <nav v-if="!subView" class="absolute bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-line safe-bottom">
+      <div class="h-[70px] flex items-stretch">
+        <button @click="goTab('home')" class="flex-1 min-h-0 flex flex-col items-center justify-center gap-1 transition" :class="activeTab === 'home' ? 'text-brand-600' : 'text-gray-400'">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>
+          <span class="text-[13px] font-bold">找球敘</span>
+        </button>
+        <button @click="goTab('records')" class="flex-1 min-h-0 flex flex-col items-center justify-center gap-1 transition" :class="activeTab === 'records' ? 'text-brand-600' : 'text-gray-400'">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+          <span class="text-[13px] font-bold">我的紀錄</span>
+        </button>
+        <button v-if="profile?.role === 'admin'" @click="goTab('admin')" class="flex-1 min-h-0 flex flex-col items-center justify-center gap-1 transition" :class="activeTab === 'admin' ? 'text-brand-600' : 'text-gray-400'">
+          <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span class="text-[13px] font-bold">管理</span>
+        </button>
+      </div>
     </nav>
 
-    <!-- [固定底部動作列] 場次詳情報名按鈕 -->
-    <div v-if="playerCurrentView === 'detail'" class="absolute bottom-0 w-full bg-white border-t border-gray-200 p-4 pb-6 z-20 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
-      <div v-if="bookingStatusForSelected">
-        <button @click="playerCurrentView = 'myRecords'" class="w-full bg-brand-textMain text-white font-bold py-3.5 rounded-xl min-h-touch active:bg-gray-800 text-lg transition-colors">
-          查看我的報名
-        </button>
-      </div>
-      <div v-else>
-        <button v-if="selectedSession.registered < selectedSession.capacity" @click="openBookingConfirm" class="w-full bg-brand-orange text-white font-bold py-3.5 rounded-xl min-h-touch active:bg-orange-700 text-lg shadow-md shadow-orange-200 transition-all">
-          立即報名
-        </button>
-        <button v-else @click="openBookingConfirm" class="w-full bg-brand-warning text-white font-bold py-3.5 rounded-xl min-h-touch active:bg-amber-700 text-lg shadow-md shadow-amber-200 transition-all">
-          加入候補
-        </button>
-      </div>
-    </div>
-
-    <!-- 報名確認 彈窗 (BottomSheet 概念，排除冗餘欄位) -->
-    <Transition name="slide-up">
-      <div v-if="showBookingConfirm" class="absolute inset-0 z-50 flex flex-col justify-end">
-        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" @click="showBookingConfirm = false"></div>
-        <div class="bg-white rounded-t-2xl p-6 relative z-10 flex flex-col gap-5 shadow-2xl">
-          <div class="flex justify-between items-center border-b border-gray-100 pb-3">
-            <h3 class="text-xl font-bold text-gray-800">
-              {{ selectedSession.registered < selectedSession.capacity ? '確認報名' : '加入候補' }}
-            </h3>
-            <button @click="showBookingConfirm = false" class="p-1 text-gray-400 min-h-touch min-w-touch flex justify-end items-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
-          <div class="bg-gray-50 p-4 rounded-xl text-sm border border-gray-100 font-medium flex flex-col gap-1">
-            <span class="text-gray-800">{{ selectedSession.name }}</span>
-            <span class="font-en text-brand-orange font-bold text-base">NT$ {{ selectedSession.price }}</span>
-          </div>
-          <div class="flex flex-col gap-4">
-            <div>
-              <label class="text-sm font-bold text-gray-700 mb-1 block">球場暱稱</label>
-              <input type="text" v-model="playerProfile.nickname" class="w-full border border-gray-300 rounded-lg p-3 min-h-touch focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all" placeholder="請輸入暱稱">
-            </div>
-            <div>
-              <label class="text-sm font-bold text-gray-700 mb-1 block">聯絡手機</label>
-              <input type="tel" v-model="playerProfile.phone" class="w-full border border-gray-300 rounded-lg p-3 min-h-touch font-en focus:outline-none focus:border-brand-orange focus:ring-1 focus:ring-brand-orange transition-all" placeholder="09XX-XXX-XXX">
-            </div>
-          </div>
-          <button @click="submitBooking" :disabled="!playerProfile.nickname || !playerProfile.phone" 
-                  class="w-full text-white font-bold py-4 rounded-xl min-h-touch text-lg mt-2 disabled:bg-gray-300 disabled:shadow-none shadow-md transition-all"
-                  :class="selectedSession.registered < selectedSession.capacity ? 'bg-brand-orange shadow-orange-200' : 'bg-brand-warning shadow-amber-200'">
-            {{ selectedSession.registered < selectedSession.capacity ? '送出報名' : '送出候補' }}
-          </button>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- 個人資料 / DUPR 開關彈窗 -->
+    <!-- AUTH SHEET -->
     <Transition name="fade">
-      <div v-if="showProfileModal" class="absolute inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showProfileModal = false"></div>
-        <div class="bg-white rounded-2xl p-6 w-full relative z-10 shadow-2xl">
-          <h3 class="text-xl font-bold mb-4">我的資料</h3>
-          <div class="flex flex-col gap-4">
-            <div>
-              <label class="text-sm font-bold text-gray-700 mb-1 block">預設暱稱</label>
-              <input type="text" v-model="playerProfile.nickname" class="w-full border border-gray-300 rounded-lg p-3 min-h-touch bg-gray-50 focus:bg-white focus:outline-none focus:border-gray-400">
+      <div v-if="showAuth" class="absolute inset-0 z-50 bg-slate-950/45 backdrop-blur-[3px] flex items-end" @click.self="showAuth = false">
+        <Transition name="sheet" appear>
+          <div class="w-full bg-white rounded-t-[32px] safe-bottom shadow-float overflow-hidden">
+            <div class="pt-3 flex justify-center">
+              <div class="w-10 h-1.5 rounded-full bg-gray-200"></div>
             </div>
-            <div>
-              <label class="text-sm font-bold text-gray-700 mb-1 block">預設手機</label>
-              <input type="tel" v-model="playerProfile.phone" class="w-full border border-gray-300 rounded-lg p-3 min-h-touch font-en bg-gray-50 focus:bg-white focus:outline-none focus:border-gray-400">
-            </div>
-            <!-- 去中心化的 DUPR Toggle -->
-            <div class="flex items-center justify-between mt-2 py-3 border-t border-gray-100">
-              <div class="pr-4">
-                <div class="font-bold text-gray-800">我已有 DUPR 帳號</div>
-                <div class="text-xs text-gray-500 mt-1 leading-relaxed">供主辦方於積分賽事快速識別資格，不直接呈現分數或排名。</div>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer min-h-touch shrink-0">
-                <input type="checkbox" v-model="playerProfile.hasDupr" class="sr-only peer">
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-orange"></div>
-              </label>
-            </div>
-          </div>
-          <button @click="showProfileModal = false" class="w-full bg-brand-textMain text-white font-bold py-3.5 rounded-xl min-h-touch mt-6 active:bg-gray-800 transition-colors">儲存設定</button>
-        </div>
-      </div>
-    </Transition>
 
-    <!-- 提議代打彈窗 -->
-    <Transition name="fade">
-      <div v-if="showSubModal" class="absolute inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="showSubModal = false"></div>
-        <div class="bg-white rounded-2xl p-6 w-full relative z-10 shadow-2xl">
-          <h3 class="text-xl font-bold mb-2">提議代打交接</h3>
-          <p class="text-sm text-gray-500 mb-4 leading-relaxed">請填寫接手此名額的球友暱稱，送出後待主辦方於後台確認即完成交接。</p>
-          <div class="flex flex-col gap-4">
-            <div>
-              <label class="text-sm font-bold text-gray-700 mb-1 block">代打人暱稱</label>
-              <input type="text" v-model="subForm.name" class="w-full border border-gray-300 rounded-lg p-3 min-h-touch focus:outline-brand-orange focus:border-brand-orange" placeholder="請輸入暱稱">
-            </div>
-            <div>
-              <label class="text-sm font-bold text-gray-700 mb-1 block">備註 (選填)</label>
-              <input type="text" v-model="subForm.note" class="w-full border border-gray-300 rounded-lg p-3 min-h-touch focus:outline-brand-orange focus:border-brand-orange" placeholder="例如：已私下匯款給原報名者">
-            </div>
-          </div>
-          <div class="flex gap-3 mt-6">
-            <button @click="showSubModal = false" class="flex-1 bg-gray-100 text-gray-600 font-bold py-3 rounded-xl min-h-touch active:bg-gray-200 transition-colors">取消</button>
-            <button @click="submitSub" :disabled="!subForm.name" class="flex-1 bg-brand-orange text-white font-bold py-3 rounded-xl min-h-touch disabled:bg-gray-300 transition-colors">送出提議</button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <!-- 狀態回饋 Toast -->
-    <Transition name="slide-up">
-      <div v-if="toastMsg" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[60] bg-brand-textMain/95 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 w-[85%] backdrop-blur-md">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" class="text-brand-green shrink-0" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        <span class="font-bold leading-relaxed">{{ toastMsg }}</span>
-      </div>
-    </Transition>
-
-  </div>
-
-  <!-- ========================================== -->
-  <!-- 角色 2：管理員端 (桌面佈局優化) -->
-  <!-- ========================================== -->
-  <div v-if="currentRole === 'admin'" class="w-full min-h-screen bg-gray-50 flex flex-col md:flex-row font-sans">
-    
-    <!-- 左側導覽列 -->
-    <aside class="w-full md:w-64 bg-brand-textMain text-white flex flex-col shrink-0 shadow-lg z-10">
-      <div class="p-6 font-en font-black text-2xl tracking-widest text-brand-orange border-b border-gray-700 flex items-center gap-3">
-        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20"/><path d="M2 12h20"/></svg>
-        ADMIN
-      </div>
-      <nav class="flex flex-col p-4 gap-2 flex-1">
-        <button @click="adminCurrentView = 'dashboard'" :class="adminCurrentView === 'dashboard' ? 'bg-white/10 text-brand-orange' : 'hover:bg-white/5'" class="text-left px-4 py-3 rounded-lg font-bold transition-colors flex items-center gap-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          儀表板
-        </button>
-        <button @click="adminCurrentView = 'sessions'" :class="adminCurrentView === 'sessions' ? 'bg-white/10 text-brand-orange' : 'hover:bg-white/5'" class="text-left px-4 py-3 rounded-lg font-bold transition-colors flex items-center gap-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          場次與名單
-        </button>
-        <button @click="adminCurrentView = 'players'" :class="adminCurrentView === 'players' ? 'bg-white/10 text-brand-orange' : 'hover:bg-white/5'" class="text-left px-4 py-3 rounded-lg font-bold transition-colors flex items-center gap-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          球友資料庫
-        </button>
-        <button @click="adminCurrentView = 'settings'" :class="adminCurrentView === 'settings' ? 'bg-white/10 text-brand-orange' : 'hover:bg-white/5'" class="text-left px-4 py-3 rounded-lg font-bold transition-colors flex items-center gap-3">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          公告與收款設定
-        </button>
-      </nav>
-    </aside>
-
-    <!-- 管理主要內容區 -->
-    <main class="flex-1 p-8 overflow-y-auto h-screen">
-      
-      <!-- [Dashboard] -->
-      <div v-if="adminCurrentView === 'dashboard'" class="flex flex-col gap-6 max-w-6xl mx-auto">
-        <h2 class="text-3xl font-bold text-gray-800">儀表板 (Dashboard)</h2>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
-          <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-            <div class="text-sm text-gray-500 mb-2 font-bold">本月排定場次</div>
-            <div class="text-4xl font-black font-en text-brand-orange">{{ mockSessions.length }}</div>
-          </div>
-          <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-            <div class="text-sm text-gray-500 mb-2 font-bold">有效報名人次</div>
-            <div class="text-4xl font-black font-en text-gray-800">{{ totalValidRegistrations }}</div>
-          </div>
-          <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 cursor-pointer hover:border-amber-400 transition-colors">
-            <div class="text-sm text-gray-500 mb-2 font-bold flex items-center justify-between">未確認應收 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
-            <div class="text-4xl font-black font-en text-brand-warning">{{ pendingPaymentsCount }} <span class="text-base font-sans text-gray-400">筆</span></div>
-          </div>
-          <div class="bg-white p-6 rounded-2xl shadow-sm border border-red-200 bg-red-50 cursor-pointer hover:border-red-400 transition-colors">
-            <div class="text-sm text-red-600 mb-2 font-bold flex items-center justify-between">待處理代打/候補 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
-            <div class="text-4xl font-black font-en text-red-600">{{ pendingSubsCount }}</div>
-          </div>
-        </div>
-        
-        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mt-4">
-          <h3 class="text-xl font-bold mb-5 border-b border-gray-100 pb-3 text-gray-800">近期場次概況</h3>
-          <div class="flex flex-col gap-4">
-            <div v-for="s in mockSessions" :key="s.id" class="flex items-center justify-between bg-gray-50 p-5 rounded-xl border border-gray-200 hover:shadow-md transition-shadow">
-              <div class="flex items-center gap-6">
-                <div class="flex flex-col items-center bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm">
-                  <span class="text-xs text-gray-500 font-bold">{{ s.day }}</span>
-                  <span class="font-en text-brand-orange font-bold text-lg">{{ s.date }}</span>
+            <div class="px-5 pt-4 pb-6">
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <div class="w-11 h-11 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  </div>
+                  <h2 class="text-[30px] leading-[1.15] tracking-[-0.02em] font-bold">{{ authMode === 'login' ? '登入球敘' : '建立帳號' }}</h2>
+                  <p class="text-[15px] text-muted mt-2 mb-0 leading-6">{{ authMode === 'login' ? '使用手機號碼與密碼登入' : '建立你的球友帳號' }}</p>
                 </div>
+                <button @click="showAuth = false" aria-label="關閉" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 active:scale-95 transition">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <div class="mt-7 flex flex-col gap-4">
+                <div v-if="authMode === 'register'">
+                  <label class="text-[15px] font-bold block mb-2">球場暱稱</label>
+                  <div class="relative">
+                    <div class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </div>
+                    <input v-model.trim="authForm.nickname" type="text" autocomplete="nickname" placeholder="輸入球場暱稱" class="w-full h-[54px] rounded-2xl border border-line bg-gray-50/70 pl-12 pr-4 outline-none transition focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-50">
+                  </div>
+                </div>
+
                 <div>
-                  <div class="font-bold text-xl text-gray-800">{{ s.name }}</div>
-                  <div class="text-sm text-gray-500 font-en mt-1">{{ s.time }} | {{ s.registered }}/{{ s.capacity }} 人</div>
+                  <label class="text-[15px] font-bold block mb-2">手機號碼</label>
+                  <div class="relative">
+                    <div class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M9 18h6"/></svg>
+                    </div>
+                    <input v-model.trim="authForm.phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="09XX XXX XXX" class="w-full h-[54px] rounded-2xl border border-line bg-gray-50/70 pl-12 pr-4 outline-none transition focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-50">
+                  </div>
                 </div>
-              </div>
-              <button @click="openAdminSessionDetail(s)" class="bg-white border border-gray-300 text-brand-textMain px-6 py-2.5 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-sm">
-                處理名單
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- [Session List] 場次管理 -->
-      <div v-if="adminCurrentView === 'sessions'" class="max-w-6xl mx-auto flex flex-col gap-6">
-        <div v-if="!adminSelectedSession">
-          <div class="flex justify-between items-center mb-6">
-            <h2 class="text-3xl font-bold text-gray-800">場次與名單管理</h2>
-            <button class="bg-brand-orange text-white px-5 py-2.5 rounded-lg font-bold hover:bg-orange-700 shadow-sm flex items-center gap-2 transition-colors">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              建立新場次
-            </button>
-          </div>
-          <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <table class="w-full text-left">
-              <thead class="bg-gray-100 text-gray-600 text-sm border-b border-gray-200">
-                <tr>
-                  <th class="p-5 font-bold">日期與時段</th>
-                  <th class="p-5 font-bold">場次名稱</th>
-                  <th class="p-5 font-bold">進度 (正取/上限)</th>
-                  <th class="p-5 font-bold">狀態指標</th>
-                  <th class="p-5 text-right font-bold">操作</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <tr v-for="s in mockSessions" :key="s.id" class="hover:bg-gray-50 transition-colors">
-                  <td class="p-5 font-en font-medium text-gray-700">{{ s.date }} <br><span class="text-xs text-gray-500">{{ s.time }}</span></td>
-                  <td class="p-5 font-bold text-gray-800 text-lg">{{ s.name }}</td>
-                  <td class="p-5">
-                    <span :class="s.registered >= s.capacity ? 'text-brand-warning bg-amber-50 border-amber-100' : 'text-brand-green bg-green-50 border-green-100'" class="font-bold px-3 py-1 rounded border">
-                      {{ s.registered }} / {{ s.capacity }}
-                    </span>
-                  </td>
-                  <td class="p-5">
-                    <div class="flex gap-2">
-                      <span v-if="getPendingForSession(s.id).sub > 0" class="bg-red-100 text-red-700 px-2.5 py-1 rounded text-xs font-bold">{{ getPendingForSession(s.id).sub }} 筆待交接</span>
-                      <span v-if="getPendingForSession(s.id).pay > 0" class="bg-amber-100 text-amber-700 px-2.5 py-1 rounded text-xs font-bold">{{ getPendingForSession(s.id).pay }} 筆未核款</span>
-                      <span v-if="getPendingForSession(s.id).sub === 0 && getPendingForSession(s.id).pay === 0" class="text-gray-400 text-xs font-bold">無待辦事項</span>
+                <div>
+                  <label class="text-[15px] font-bold block mb-2">密碼</label>
+                  <div class="relative">
+                    <div class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
                     </div>
-                  </td>
-                  <td class="p-5 text-right">
-                    <div class="flex justify-end gap-3">
-                      <button class="text-gray-400 hover:text-gray-800 font-bold text-sm">編輯/複製</button>
-                      <button @click="openAdminSessionDetail(s)" class="text-brand-orange font-bold text-sm hover:underline">檢視名單</button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        
-        <!-- [Session Detail] 單場名單審計詳情 -->
-        <div v-if="adminSelectedSession">
-          <button @click="adminSelectedSession = null" class="mb-5 text-gray-500 font-bold hover:text-gray-800 flex items-center gap-1 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> 返回列表
-          </button>
-          
-          <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
-            <div class="flex justify-between items-start">
-              <div>
-                <h2 class="text-3xl font-bold mb-2 text-gray-800">{{ adminSelectedSession.name }}</h2>
-                <div class="text-gray-600 font-en mb-4 flex gap-3">
-                  <span class="bg-gray-100 px-2 py-1 rounded text-sm">{{ adminSelectedSession.date }}</span>
-                  <span class="bg-gray-100 px-2 py-1 rounded text-sm">{{ adminSelectedSession.time }}</span>
-                  <span class="bg-brand-orangeLight text-brand-orange px-2 py-1 rounded text-sm font-bold">NT$ {{ adminSelectedSession.price }}</span>
+                    <input v-model="authForm.password" :type="showPassword ? 'text' : 'password'" :autocomplete="authMode === 'login' ? 'current-password' : 'new-password'" placeholder="至少 8 碼" @keyup.enter="submitAuth" class="w-full h-[54px] rounded-2xl border border-line bg-gray-50/70 pl-12 pr-14 outline-none transition focus:bg-white focus:border-brand-500 focus:ring-4 focus:ring-brand-50">
+                    <button type="button" @click="showPassword = !showPassword" :aria-label="showPassword ? '隱藏密碼' : '顯示密碼'" class="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 min-h-0 rounded-xl text-gray-400 hover:text-ink hover:bg-gray-100 flex items-center justify-center transition">
+                      <svg v-if="!showPassword" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                      <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c6.5 0 10 8 10 8a18.6 18.6 0 0 1-2.1 3.2"/><path d="M6.6 6.6C3.8 8.5 2 12 2 12s3.5 8 10 8a9.8 9.8 0 0 0 4.1-.9"/></svg>
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <button class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-bold text-sm hover:bg-gray-50 shadow-sm">匯出名單 (Excel)</button>
-            </div>
-            
-            <div class="bg-gray-50 p-4 rounded-xl text-sm border border-gray-200 flex flex-col gap-2">
-              <div class="flex gap-2">
-                <span class="font-bold text-gray-700 shrink-0 border-r border-gray-300 pr-3">內部備註</span> 
-                <span class="text-gray-600">僅管理員可見。本場次須向場館結算費用 1,000 元，並提供兩桶新球。</span>
-              </div>
-            </div>
-          </div>
 
-          <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-            <div class="p-5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-              <h3 class="font-bold text-lg text-gray-800">報名與候補名單</h3>
-              <div class="text-sm font-bold text-gray-500">正取名額: <span class="text-brand-textMain text-base">{{ adminSelectedSession.registered }} / {{ adminSelectedSession.capacity }}</span></div>
+                <div v-if="authError" class="rounded-2xl bg-red-50 border border-red-100 text-red-700 px-4 py-3.5 data-text flex gap-2.5 items-start">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="shrink-0 mt-0.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+                  <span>{{ authError }}</span>
+                </div>
+
+                <button @click="submitAuth" :disabled="authLoading" class="w-full h-[54px] min-h-0 rounded-2xl bg-brand-500 text-white font-bold text-[17px] shadow-[0_8px_22px_rgba(249,115,22,.22)] hover:bg-brand-600 active:scale-[.99] disabled:opacity-50 disabled:shadow-none transition">
+                  {{ authLoading ? '處理中…' : (authMode === 'login' ? '登入' : '建立帳號') }}
+                </button>
+                <button @click="switchAuthMode" class="w-full h-[50px] min-h-0 rounded-2xl bg-white border border-line text-ink font-bold text-[16px] hover:bg-gray-50 active:scale-[.99] transition">
+                  {{ authMode === 'login' ? '建立帳號' : '返回登入' }}
+                </button>
+              </div>
             </div>
-            <table class="w-full text-left text-sm">
-              <thead class="bg-white text-gray-500 border-b border-gray-200">
-                <tr>
-                  <th class="p-4 w-12 text-center">#</th>
-                  <th class="p-4">球友資料</th>
-                  <th class="p-4">系統狀態</th>
-                  <th class="p-4 text-center">收款查核 (Audit)</th>
-                  <th class="p-4 text-center">實際出席</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <tr v-for="(b, index) in getBookingsForSession(adminSelectedSession.id)" :key="b.id" class="hover:bg-gray-50 transition-colors" :class="{'opacity-50 bg-gray-50': b.status === 'cancelled'}">
-                  <td class="p-4 text-gray-400 font-en text-center">{{ index + 1 }}</td>
-                  <td class="p-4">
-                    <div class="font-bold text-base flex items-center gap-2 text-gray-800">
-                      {{ b.userNickname }}
-                      <span v-if="b.hasDupr" class="bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded font-bold font-en border border-blue-200" title="具備 DUPR 帳號">DUPR</span>
-                    </div>
-                    <div class="text-xs text-gray-500 font-en mt-1">{{ b.userPhone }}</div>
-                    
-                    <!-- 代打管理區塊 -->
-                    <div v-if="b.status === 'sub_pending'" class="mt-3 text-brand-warning font-bold bg-amber-50 p-3 rounded-lg text-xs border border-amber-200 flex items-center justify-between">
-                      <span>提議代打：{{ b.subName }}</span>
-                      <button @click="confirmSub(b)" class="bg-brand-textMain text-white px-3 py-1.5 rounded hover:bg-gray-800 transition-colors shadow-sm">確認交接 (沿用收款)</button>
-                    </div>
-                    <div v-if="b.status === 'substituted'" class="mt-2 text-gray-500 font-bold text-xs bg-gray-100 p-2 rounded-md border border-gray-200 inline-flex items-center gap-1">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg> 
-                      名額已交接給：{{ b.subName }}
-                    </div>
-                  </td>
-                  <td class="p-4">
-                    <span :class="bookingStatusStyle(b.status)" class="px-3 py-1.5 rounded text-xs font-bold inline-block border">
-                      {{ bookingStatusText(b.status) }}
-                    </span>
-                    <div v-if="b.status === 'waitlisted'" class="text-xs text-brand-warning font-bold mt-2">順位: {{ b.waitlistPosition }}</div>
-                  </td>
-                  <td class="p-4 text-center align-middle">
-                    <!-- 收款核對 Toggle -->
-                    <div v-if="b.status !== 'cancelled' && b.status !== 'waitlisted'" class="flex flex-col items-center gap-1.5">
-                      <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" :checked="b.paymentStatus === 'paid'" @change="togglePayment(b)" class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-brand-green peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all shadow-inner"></div>
-                      </label>
-                      <span class="text-[10px] text-brand-green font-bold bg-green-50 px-2 py-0.5 rounded" v-if="b.paymentStatus === 'paid'">已收款 (軌跡保留)</span>
-                      <span class="text-[10px] text-brand-warning font-bold bg-amber-50 px-2 py-0.5 rounded" v-else>未核款</span>
-                    </div>
-                    <div v-else class="text-gray-300">-</div>
-                  </td>
-                  <td class="p-4 text-center align-middle">
-                    <input type="checkbox" v-if="b.status === 'paid' || b.status === 'registered' || b.status === 'substituted'" class="w-5 h-5 rounded border-gray-300 text-brand-textMain focus:ring-brand-textMain cursor-pointer">
-                    <div v-else class="text-gray-300">-</div>
-                  </td>
-                </tr>
-                <tr v-if="getBookingsForSession(adminSelectedSession.id).length === 0">
-                  <td colspan="5" class="p-10 text-center text-gray-400 font-bold">尚無名單資料</td>
-                </tr>
-              </tbody>
-            </table>
           </div>
+        </Transition>
+      </div>
+    </Transition>
+
+    <!-- BOOKING SHEET -->
+    <Transition name="fade">
+      <div v-if="showBooking" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showBooking = false">
+        <Transition name="sheet" appear>
+          <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float">
+            <div class="flex items-center justify-between"><h2 class="text-[23px] font-bold">確認報名</h2><button @click="showBooking = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+            <div class="mt-4 rounded-2xl bg-brand-50 p-4"><div class="font-bold">{{ formatDateShort(selectedSession?.start_at) }} · {{ formatTimeRange(selectedSession?.start_at, selectedSession?.end_at) }}</div><div class="data-text text-brand-700 mt-1">{{ selectedSession?.venue }}</div></div>
+
+            <div class="mt-4 bg-gray-100 p-1 rounded-xl flex">
+              <button @click="setBookingMode('self')" class="flex-1 h-11 min-h-0 rounded-lg font-bold text-[15px]" :class="bookingForm.mode === 'self' ? 'bg-white shadow-sm' : 'text-muted'">我自己</button>
+              <button @click="setBookingMode('friend')" class="flex-1 h-11 min-h-0 rounded-lg font-bold text-[15px]" :class="bookingForm.mode === 'friend' ? 'bg-white shadow-sm' : 'text-muted'">幫朋友報名</button>
+            </div>
+
+            <div class="mt-4 flex flex-col gap-4">
+              <div><label class="font-bold block mb-2">參加者暱稱</label><input v-model.trim="bookingForm.nickname" :readonly="bookingForm.mode === 'self'" type="text" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50"></div>
+              <div><label class="font-bold block mb-2">參加者手機</label><input v-model.trim="bookingForm.phone" :readonly="bookingForm.mode === 'self'" type="tel" inputmode="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50"></div>
+              <div v-if="bookingError" class="rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 data-text">{{ bookingError }}</div>
+              <button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : '送出報名' }}</button>
+            </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+
+    <!-- PROFILE SHEET -->
+    <Transition name="fade">
+      <div v-if="showProfile" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showProfile = false">
+        <Transition name="sheet" appear>
+          <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float max-h-[90vh] overflow-y-auto app-scroll">
+            <div class="flex items-center justify-between"><div><div class="text-[14px] font-bold text-brand-600">PROFILE</div><h2 class="text-[24px] font-bold mt-1">我的資料</h2></div><button @click="showProfile = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+            <div class="mt-5 flex flex-col gap-4">
+              <div><label class="font-bold block mb-2">暱稱</label><input v-model.trim="profileForm.nickname" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+              <div><label class="font-bold block mb-2">登入手機</label><input v-model.trim="profileForm.phone" type="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"><div class="text-[13px] text-muted mt-2">變更後，下次請使用新手機號碼登入。</div></div>
+              <div class="rounded-2xl border border-line p-4">
+                <label class="flex items-center justify-between gap-4 cursor-pointer">
+                  <div><div class="font-bold">我有 DUPR 帳號</div><div class="text-[13px] text-muted mt-1">只記錄是否有帳號與 ID，不儲存分數排名。</div></div>
+                  <input v-model="profileForm.hasDupr" type="checkbox" class="w-5 h-5 accent-orange-500">
+                </label>
+                <div v-if="profileForm.hasDupr" class="mt-4"><label class="font-bold block mb-2">DUPR ID</label><input v-model.trim="profileForm.duprId" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="選填"></div>
+              </div>
+              <div v-if="profileError" class="rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 data-text">{{ profileError }}</div>
+              <button @click="saveProfile" :disabled="profileLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ profileLoading ? '儲存中…' : '儲存資料' }}</button>
+              <button @click="logout" class="w-full rounded-xl border border-red-200 text-red-600 bg-white font-bold py-3">登出</button>
+            </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+
+    <!-- SUBSTITUTE SHEET -->
+    <Transition name="fade">
+      <div v-if="showSubstitute" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showSubstitute = false">
+        <Transition name="sheet" appear>
+          <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float">
+            <div class="flex justify-between items-center"><h2 class="text-[23px] font-bold">更換參加者</h2><button @click="showSubstitute = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+            <p class="text-muted leading-7">填入實際接手名額的球友。已確認收款後，球友端不能自行更換。</p>
+            <div class="flex flex-col gap-4">
+              <div><label class="font-bold block mb-2">新參加者暱稱</label><input v-model.trim="substituteForm.nickname" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+              <div><label class="font-bold block mb-2">新參加者手機</label><input v-model.trim="substituteForm.phone" type="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+              <div><label class="font-bold block mb-2">備註</label><input v-model.trim="substituteForm.note" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="選填"></div>
+              <button @click="submitSubstitute" :disabled="substituteLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ substituteLoading ? '處理中…' : '確認更換' }}</button>
+            </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+
+    <!-- FINANCE EDIT SHEET -->
+    <Transition name="fade">
+      <div v-if="showFinanceEdit" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showFinanceEdit = false">
+        <Transition name="sheet" appear>
+          <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float">
+            <div class="flex justify-between items-center"><h2 class="text-[23px] font-bold">調整待確認紀錄</h2><button @click="showFinanceEdit = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+            <div class="mt-5 flex flex-col gap-4">
+              <div><label class="font-bold block mb-2">金額</label><input v-model.number="financeEditForm.amount" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+              <div><label class="font-bold block mb-2">套票增減</label><input v-model.number="financeEditForm.packageDelta" type="number" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+              <div><label class="font-bold block mb-2">備註</label><input v-model.trim="financeEditForm.note" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+              <button @click="saveFinanceEdit" :disabled="adminActionLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">儲存待確認內容</button>
+            </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+
+    <!-- CREATE SESSION SHEET -->
+    <Transition name="fade">
+      <div v-if="showCreateSession" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showCreateSession = false">
+        <Transition name="sheet" appear>
+          <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float max-h-[92vh] overflow-y-auto app-scroll">
+            <div class="flex justify-between items-center"><div><div class="text-[14px] font-bold text-brand-600">NEW SESSION</div><h2 class="text-[23px] font-bold mt-1">建立新場次</h2></div><button @click="showCreateSession = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+            <div class="mt-5 flex flex-col gap-4">
+              <div><label class="font-bold block mb-2">開始時間</label><input v-model="sessionForm.start" type="datetime-local" class="w-full h-12 rounded-xl border border-line px-3"></div>
+              <div><label class="font-bold block mb-2">結束時間</label><input v-model="sessionForm.end" type="datetime-local" class="w-full h-12 rounded-xl border border-line px-3"></div>
+              <div><label class="font-bold block mb-2">場地</label><input v-model.trim="sessionForm.venue" class="w-full h-12 rounded-xl border border-line px-4" placeholder="例如：Pickle Fever 泰山館"></div>
+              <div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">類型</label><input v-model.trim="sessionForm.category" class="w-full h-12 rounded-xl border border-line px-4" placeholder="一般場"></div><div><label class="font-bold block mb-2">人數上限</label><input v-model.number="sessionForm.capacity" type="number" min="1" class="w-full h-12 rounded-xl border border-line px-4"></div></div>
+              <div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">單次費用</label><input v-model.number="sessionForm.price" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4"></div><div><label class="font-bold block mb-2">套票扣次</label><input v-model.number="sessionForm.units" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4"></div></div>
+              <div><label class="font-bold block mb-2">報名截止</label><input v-model="sessionForm.registrationDeadline" type="datetime-local" class="w-full h-12 rounded-xl border border-line px-3"></div>
+              <div><label class="font-bold block mb-2">取消截止</label><input v-model="sessionForm.cancelDeadline" type="datetime-local" class="w-full h-12 rounded-xl border border-line px-3"></div>
+              <div><label class="font-bold block mb-2">公開備註</label><textarea v-model.trim="sessionForm.publicNote" rows="3" class="w-full rounded-xl border border-line p-4 resize-none" placeholder="球友可見"></textarea></div>
+              <div><label class="font-bold block mb-2">內部備註</label><textarea v-model.trim="sessionForm.internalNote" rows="3" class="w-full rounded-xl border border-line p-4 resize-none" placeholder="僅管理員可見"></textarea></div>
+              <button @click="createSession" :disabled="adminActionLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ adminActionLoading ? '建立中…' : '建立並開放報名' }}</button>
+            </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+
+    <!-- TOAST -->
+    <Transition name="fade">
+      <div v-if="toast" class="absolute left-4 right-4 bottom-24 z-[80] flex justify-center pointer-events-none">
+        <div class="max-w-sm bg-ink text-white rounded-2xl px-4 py-3 shadow-float flex items-start gap-3">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="text-orange-300 shrink-0 mt-0.5"><path d="M20 6L9 17l-5-5"/></svg>
+          <span class="font-semibold leading-6">{{ toast }}</span>
         </div>
       </div>
-      
-      <!-- [Placeholder Views] -->
-      <div v-if="adminCurrentView === 'players' || adminCurrentView === 'settings'" class="max-w-6xl mx-auto flex flex-col items-center justify-center h-64 border-2 border-dashed border-gray-300 rounded-2xl bg-gray-50/50">
-        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" class="text-gray-300 mb-4" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-        <p class="text-gray-500 font-bold text-lg">系統資料庫 / 偏好設定</p>
-        <p class="text-gray-400 text-sm mt-1">此管理區塊於本次 UX/UI 原型中不特別展開展示</p>
-      </div>
-
-    </main>
+    </Transition>
   </div>
-
 </div>
 
 <script>
-  const { createApp, ref, computed } = Vue;
+  const { createApp, ref, computed, onMounted } = Vue;
+
+  const SUPABASE_URL = 'https://bpaxiozotebbkycwjsup.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_XYOLSLzLlIjiRcKZOSJnZQ_3nHIeHTg';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+  });
+
+  // 場次示意圖：正式上線後只要替換這個網址即可。
+  const SESSION_PLACEHOLDER_IMAGE = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#FFF1E6"/>
+          <stop offset="1" stop-color="#F97316"/>
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="675" fill="url(#g)"/>
+      <rect x="130" y="95" width="940" height="485" rx="24" fill="none" stroke="#ffffff" stroke-width="10" opacity="0.9"/>
+      <line x1="600" y1="95" x2="600" y2="580" stroke="#ffffff" stroke-width="8" opacity="0.9"/>
+      <line x1="130" y1="337.5" x2="1070" y2="337.5" stroke="#ffffff" stroke-width="8" opacity="0.9"/>
+      <circle cx="860" cy="185" r="58" fill="#ffffff" opacity="0.92"/>
+      <circle cx="838" cy="164" r="7" fill="#F97316"/><circle cx="882" cy="164" r="7" fill="#F97316"/>
+      <circle cx="838" cy="206" r="7" fill="#F97316"/><circle cx="882" cy="206" r="7" fill="#F97316"/>
+    </svg>`);
 
   createApp({
     setup() {
-      // 角色與視圖控制狀態機
-      const currentRole = ref('player'); 
-      const playerCurrentView = ref('home'); 
-      const adminCurrentView = ref('dashboard'); 
-      
-      const switchRole = (role) => { currentRole.value = role; };
-      const goBack = () => { playerCurrentView.value = 'home'; };
+      const booting = ref(true);
+      const user = ref(null);
+      const profile = ref(null);
+      const activeTab = ref('home');
+      const subView = ref(null);
+      const toast = ref('');
+      let toastTimer = null;
 
-      // 球友 Mock 資料
-      const playerProfile = ref({
-        nickname: 'Wayne',
-        phone: '0912345678',
-        hasDupr: true
-      });
-
-      // UI 顯示狀態
-      const currentFilter = ref('all');
-      const filterOptions = [
-        { label: '全部場次', value: 'all' },
-        { label: '尚可報名', value: 'available' },
-        { label: '候補階段', value: 'waitlist' }
-      ];
-      const showBookingConfirm = ref(false);
-      const showProfileModal = ref(false);
-      const showSubModal = ref(false);
-      const toastMsg = ref('');
-      
+      const publicSessions = ref([]);
+      const sessionsLoading = ref(false);
       const selectedSession = ref(null);
+      const publicRoster = ref([]);
+      const rosterLoading = ref(false);
+
+      const showAuth = ref(false);
+      const authMode = ref('login');
+      const authLoading = ref(false);
+      const authError = ref('');
+      const authForm = ref({ phone: '', nickname: '', password: '' });
+      const showPassword = ref(false);
+
+      const showBooking = ref(false);
+      const bookingLoading = ref(false);
+      const bookingError = ref('');
+      const bookingForm = ref({ mode: 'self', nickname: '', phone: '' });
+
+      const recordsMode = ref('bookings');
+      const recordsLoading = ref(false);
+      const myBookings = ref([]);
+      const myFinance = ref([]);
+      const packageBalance = ref(0);
+      const myBookingsOffset = ref(0);
+      const myFinanceOffset = ref(0);
+      const myBookingsHasMore = ref(false);
+      const myFinanceHasMore = ref(false);
+
+      const showProfile = ref(false);
+      const profileLoading = ref(false);
+      const profileError = ref('');
+      const profileForm = ref({ nickname: '', phone: '', hasDupr: false, duprId: '' });
+
+      const showSubstitute = ref(false);
+      const substituteLoading = ref(false);
+      const substituteTarget = ref(null);
+      const substituteForm = ref({ nickname: '', phone: '', note: '' });
+
+      const adminMode = ref('sessions');
+      const adminSessions = ref([]);
       const adminSelectedSession = ref(null);
-      const subForm = ref({ name: '', note: '', bookingId: null });
+      const adminRoster = ref([]);
+      const adminRosterLoading = ref(false);
+      const adminActionLoading = ref(false);
+      const adminFinance = ref([]);
+      const adminFinanceOffset = ref(0);
+      const adminFinanceHasMore = ref(false);
+      const financeFilter = ref({ search: '', from: '', to: '' });
 
-      // 場次 Mock 資料 (結合 Pickle Fever 等情境)
-      const mockSessions = ref([
-        {
-          id: 1, date: '11/07', day: '週六', time: '08:00–10:00',
-          name: '週末晨間歡樂場', type: 'general', tags: ['一般場', '新手友善'],
-          venue: 'Pickle Fever (泰山館)', price: 350, capacity: 8, registered: 6,
-          deadline: '11/06 12:00', cancelDeadline: '11/05 08:00',
-          publicNote: '本場次適合 2.5-3.5 球友。\n提供免費租借初階球拍服務，備有冷氣與飲水機。'
-        },
-        {
-          id: 2, date: '11/07', day: '週六', time: '14:00–17:00',
-          name: 'DUPR 限制計分賽', type: 'dupr', tags: ['DUPR 積分', '競技賽'],
-          venue: 'Pickle Ing (新莊館)', price: 500, capacity: 16, registered: 16,
-          deadline: '11/05 23:59', cancelDeadline: '11/03 23:59',
-          publicNote: '限 DUPR 3.5 以上報名。\n請確保已於個人資料中勾選「已有 DUPR 帳號」，成績將統一上傳 Pickle Town 系統。'
-        }
-      ]);
+      const showFinanceEdit = ref(false);
+      const financeEditTarget = ref(null);
+      const financeEditForm = ref({ amount: 0, packageDelta: 0, note: '' });
 
-      // 報名紀錄 Mock 資料 (展示代打、候補與未核款狀態)
-      const mockBookings = ref([
-        {
-          id: 101, sessionId: 2, userId: 'u1', userNickname: 'Wayne', userPhone: '0912345678', hasDupr: true,
-          status: 'paid', paymentStatus: 'paid', waitlistPosition: 0, subName: ''
-        },
-        {
-          id: 102, sessionId: 2, userId: 'u2', userNickname: '球友A', userPhone: '0900000000', hasDupr: false,
-          status: 'sub_pending', paymentStatus: 'paid', waitlistPosition: 0, subName: 'Allen'
-        },
-        {
-          id: 103, sessionId: 2, userId: 'u3', userNickname: '球友B', userPhone: '0900000000', hasDupr: true,
-          status: 'waitlisted', paymentStatus: 'unpaid', waitlistPosition: 1, subName: ''
-        }
-      ]);
-
-      // --- 球友端 (Player) 計算屬性 ---
-      const filteredSessions = computed(() => {
-        if (currentFilter.value === 'available') return mockSessions.value.filter(s => s.registered < s.capacity);
-        if (currentFilter.value === 'waitlist') return mockSessions.value.filter(s => s.registered >= s.capacity);
-        return mockSessions.value;
+      const showCreateSession = ref(false);
+      const sessionForm = ref({
+        start: '', end: '', venue: '', category: '一般場', capacity: 10,
+        price: 500, units: 1, registrationDeadline: '', cancelDeadline: '',
+        publicNote: '', internalNote: ''
       });
 
-      const myBookingsList = computed(() => {
-        return mockBookings.value
-          .filter(b => b.userId === 'u1')
-          .map(b => ({
-            ...b,
-            session: mockSessions.value.find(s => s.id === b.sessionId)
-          })).reverse();
+      const filteredPublicSessions = computed(() => {
+        return [...publicSessions.value].sort((a, b) => {
+          const aOpen = a.status === 'open' ? 0 : 1;
+          const bOpen = b.status === 'open' ? 0 : 1;
+          if (aOpen !== bOpen) return aOpen - bOpen;
+          const aTime = new Date(a.start_at).getTime();
+          const bTime = new Date(b.start_at).getTime();
+          return a.status === 'open' ? aTime - bTime : bTime - aTime;
+        });
       });
 
-      const bookingStatusForSelected = computed(() => {
-        if (!selectedSession.value) return null;
-        return mockBookings.value.find(b => b.userId === 'u1' && b.sessionId === selectedSession.value.id && b.status !== 'cancelled');
+      const canBookSelectedSession = computed(() => {
+        const s = selectedSession.value;
+        if (!s || s.status !== 'open' || s.remaining_spots <= 0) return false;
+        if (s.registration_deadline && new Date(s.registration_deadline).getTime() < Date.now()) return false;
+        return true;
       });
 
-      // --- 球友端 (Player) 互動邏輯 ---
-      const viewDetail = (session) => {
-        selectedSession.value = session;
-        playerCurrentView.value = 'detail';
-      };
+      function showToast(message) {
+        toast.value = message;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.value = '', 3200);
+      }
 
-      const openBookingConfirm = () => { showBookingConfirm.value = true; };
-
-      const showToast = (msg) => {
-        toastMsg.value = msg;
-        setTimeout(() => { toastMsg.value = ''; }, 3000);
-      };
-
-      const submitBooking = () => {
-        const session = selectedSession.value;
-        const isWaitlist = session.registered >= session.capacity;
-        
-        const newBooking = {
-          id: Date.now(),
-          sessionId: session.id,
-          userId: 'u1',
-          userNickname: playerProfile.value.nickname,
-          userPhone: playerProfile.value.phone,
-          hasDupr: playerProfile.value.hasDupr,
-          status: isWaitlist ? 'waitlisted' : 'registered',
-          paymentStatus: 'unpaid',
-          waitlistPosition: isWaitlist ? 2 : 0, 
-          subName: ''
-        };
-
-        mockBookings.value.push(newBooking);
-        
-        if (!isWaitlist) {
-          const sIndex = mockSessions.value.findIndex(s => s.id === session.id);
-          mockSessions.value[sIndex].registered += 1;
+      function normalizePhone(input) {
+        const digits = String(input || '').replace(/\D/g, '');
+        let local = digits;
+        if (digits.startsWith('886')) {
+          const rest = digits.slice(3);
+          local = rest.startsWith('0') ? rest : '0' + rest;
+        } else if (digits.length === 9 && digits.startsWith('9')) {
+          local = '0' + digits;
         }
+        if (!/^09\d{8}$/.test(local)) throw new Error('請輸入正確的台灣手機號碼');
+        return local;
+      }
 
-        showBookingConfirm.value = false;
-        showToast(isWaitlist ? '已加入候補名單，遞補成功將另行通知' : '報名成功！請至「我的紀錄」查看付款資訊');
-      };
+      function internalEmail(phone) {
+        return `${normalizePhone(phone)}@pickle.example.com`;
+      }
 
-      const cancelBooking = (booking) => {
-        if(confirm('確定要取消此場次的報名/候補嗎？\n(取消後不可復原)')) {
-          const bIndex = mockBookings.value.findIndex(b => b.id === booking.id);
-          mockBookings.value[bIndex].status = 'cancelled';
-          
-          if(booking.status === 'registered' || booking.status === 'paid') {
-            const sIndex = mockSessions.value.findIndex(s => s.id === booking.sessionId);
-            mockSessions.value[sIndex].registered -= 1;
-          }
-          showToast('已完成取消作業');
-        }
-      };
+      function money(value) {
+        return Number(value || 0).toLocaleString('zh-TW');
+      }
 
-      const openSubModal = (booking) => {
-        subForm.value = { name: '', note: '', bookingId: booking.id };
-        showSubModal.value = true;
-      };
+      function signedUnits(value) {
+        const n = Number(value || 0);
+        if (n > 0) return `+${n}`;
+        if (n < 0) return `${n}`;
+        return '0';
+      }
 
-      const submitSub = () => {
-        const bIndex = mockBookings.value.findIndex(b => b.id === subForm.value.bookingId);
-        mockBookings.value[bIndex].status = 'sub_pending';
-        mockBookings.value[bIndex].subName = subForm.value.name;
-        showSubModal.value = false;
-        showToast('已送出代打提議，待管理員確認後生效');
-      };
+      const weekdayFmt = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', weekday: 'short' });
+      const shortDateFmt = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', weekday: 'short' });
+      const longDateFmt = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' });
+      const timeFmt = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+      const dateTimeFmt = new Intl.DateTimeFormat('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
 
-      // --- 視覺與狀態解析 Helper ---
-      const sessionStatusClass = (session) => {
-        if (session.registered >= session.capacity) return 'bg-amber-100 text-brand-warning border border-amber-200';
-        if (session.capacity - session.registered <= 2) return 'bg-orange-100 text-brand-orange border border-orange-200';
-        return 'bg-green-100 text-brand-green border border-green-200';
-      };
-      const sessionStatusText = (session) => {
-        if (session.registered >= session.capacity) return '額滿 / 候補中';
-        if (session.capacity - session.registered <= 2) return '即將額滿';
+      function formatDateShort(value) { return value ? shortDateFmt.format(new Date(value)) : '—'; }
+      function formatDateLong(value) { return value ? longDateFmt.format(new Date(value)) : '—'; }
+      function formatTimeRange(start, end) { return start && end ? `${timeFmt.format(new Date(start))}–${timeFmt.format(new Date(end))}` : '—'; }
+      function formatDateTime(value) { return value ? dateTimeFmt.format(new Date(value)) : '—'; }
+      function formatDeadline(value) { return value ? `${formatDateShort(value)} ${timeFmt.format(new Date(value))}` : '未設定'; }
+
+      function sessionProgress(session) {
+        if (!session?.capacity) return 0;
+        return Math.min(100, Math.round((Number(session.registered_count || 0) / Number(session.capacity)) * 100));
+      }
+
+      function sessionStatusText(session) {
+        if (session.status === 'settled') return '已結算';
+        if (session.status === 'cancelled') return '已取消';
+        if (session.status !== 'open') return '未開放';
+        if (session.remaining_spots <= 0) return '已額滿';
+        if (session.remaining_spots <= 2) return '即將額滿';
         return '尚有名額';
-      };
+      }
 
-      const bookingStatusStyle = (status) => {
-        const map = {
-          registered: 'bg-green-100 text-brand-green border-green-200',
-          paid: 'bg-brand-textMain text-white border-gray-800',
-          waitlisted: 'bg-amber-100 text-brand-warning border-amber-200',
-          sub_pending: 'bg-amber-50 text-brand-warning border-amber-200',
-          substituted: 'bg-gray-200 text-gray-600 border-gray-300',
-          cancelled: 'bg-gray-100 text-gray-400 border-gray-200'
+      function sessionStatusClass(session) {
+        if (session.status === 'settled' || session.status === 'cancelled') return 'bg-gray-100 text-gray-600';
+        if (session.remaining_spots <= 0) return 'bg-gray-100 text-gray-600';
+        if (session.remaining_spots <= 2) return 'bg-brand-50 text-brand-700';
+        return 'bg-emerald-50 text-emerald-700';
+      }
+
+      function sessionDbStatusText(status) {
+        return ({ draft: '草稿', open: '開放報名', settled: '已結算', cancelled: '已取消' })[status] || status || '—';
+      }
+
+      async function loadPublicSessions() {
+        sessionsLoading.value = true;
+        const { data, error } = await sb.rpc('list_public_sessions', { p_limit: 30, p_offset: 0, p_status: null });
+        sessionsLoading.value = false;
+        if (error) { showToast(`場次載入失敗：${error.message}`); return; }
+        publicSessions.value = data || [];
+      }
+
+      async function loadProfile() {
+        if (!user.value) { profile.value = null; return; }
+        const { data, error } = await sb.from('players')
+          .select('id,auth_user_id,phone,nickname,has_dupr,dupr_id,role')
+          .eq('auth_user_id', user.value.id)
+          .single();
+        if (error) {
+          profile.value = null;
+          return;
+        }
+        profile.value = data;
+      }
+
+      async function refreshAuthState() {
+        const { data: { session } } = await sb.auth.getSession();
+        user.value = session?.user || null;
+        await loadProfile();
+      }
+
+      async function loadMyData(reset = true) {
+        if (!user.value || !profile.value) return;
+        recordsLoading.value = true;
+        if (reset) {
+          myBookingsOffset.value = 0;
+          myFinanceOffset.value = 0;
+        }
+
+        const [bookingsRes, financeRes, balanceRes] = await Promise.all([
+          sb.rpc('get_my_bookings', { p_limit: 30, p_offset: myBookingsOffset.value }),
+          sb.rpc('get_my_financial_history', { p_limit: 30, p_offset: myFinanceOffset.value }),
+          sb.rpc('get_my_package_balance')
+        ]);
+        recordsLoading.value = false;
+
+        if (bookingsRes.error || financeRes.error || balanceRes.error) {
+          showToast('個人紀錄載入失敗');
+          return;
+        }
+        myBookings.value = bookingsRes.data || [];
+        myFinance.value = financeRes.data || [];
+        packageBalance.value = Number(balanceRes.data || 0);
+        myBookingsHasMore.value = (bookingsRes.data || []).length === 30;
+        myFinanceHasMore.value = (financeRes.data || []).length === 30;
+      }
+
+      async function loadMoreBookings() {
+        myBookingsOffset.value += 30;
+        const { data, error } = await sb.rpc('get_my_bookings', { p_limit: 30, p_offset: myBookingsOffset.value });
+        if (error) { showToast(error.message); return; }
+        myBookings.value.push(...(data || []));
+        myBookingsHasMore.value = (data || []).length === 30;
+      }
+
+      async function loadMoreFinance() {
+        myFinanceOffset.value += 30;
+        const { data, error } = await sb.rpc('get_my_financial_history', { p_limit: 30, p_offset: myFinanceOffset.value });
+        if (error) { showToast(error.message); return; }
+        myFinance.value.push(...(data || []));
+        myFinanceHasMore.value = (data || []).length === 30;
+      }
+
+      async function loadAdminSessions() {
+        if (profile.value?.role !== 'admin') return;
+        const { data, error } = await sb.rpc('list_admin_sessions', { p_limit: 30, p_offset: 0, p_status: null });
+        if (error) { showToast(`管理場次載入失敗：${error.message}`); return; }
+        adminSessions.value = data || [];
+      }
+
+      function filterDateArgs() {
+        let from = null, to = null;
+        if (financeFilter.value.from) from = new Date(`${financeFilter.value.from}T00:00:00+08:00`).toISOString();
+        if (financeFilter.value.to) {
+          const d = new Date(`${financeFilter.value.to}T00:00:00+08:00`);
+          d.setDate(d.getDate() + 1);
+          to = d.toISOString();
+        }
+        return { from, to };
+      }
+
+      async function openAdminFinance() {
+        adminMode.value = 'finance';
+        await loadAdminFinance(true);
+      }
+
+      async function loadAdminFinance(reset = true) {
+        if (profile.value?.role !== 'admin') return;
+        if (reset) adminFinanceOffset.value = 0;
+        const dates = filterDateArgs();
+        const { data, error } = await sb.rpc('search_admin_financial_history', {
+          p_from: dates.from,
+          p_to: dates.to,
+          p_search: financeFilter.value.search || null,
+          p_limit: 30,
+          p_offset: adminFinanceOffset.value
+        });
+        if (error) { showToast(`財務查詢失敗：${error.message}`); return; }
+        if (reset) adminFinance.value = data || [];
+        else adminFinance.value.push(...(data || []));
+        adminFinanceHasMore.value = (data || []).length === 30;
+      }
+
+      async function loadMoreAdminFinance() {
+        adminFinanceOffset.value += 30;
+        await loadAdminFinance(false);
+      }
+
+      async function exportFinanceCsv() {
+        const dates = filterDateArgs();
+        const { data, error } = await sb.rpc('export_admin_financial_history', {
+          p_from: dates.from,
+          p_to: dates.to,
+          p_search: financeFilter.value.search || null
+        });
+        if (error) { showToast(`匯出失敗：${error.message}`); return; }
+        const rows = data || [];
+        const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+        const header = ['日期','球友','套票餘額','金額','套票次數','狀態','操作者','備註'];
+        const body = rows.map(r => [
+          formatDateTime(r.date_at), r.player, r.package_balance ?? '', r.amount ?? 0,
+          r.package_units ?? 0, r.status, r.operator ?? '', r.note ?? ''
+        ].map(esc).join(','));
+        const csv = '\uFEFF' + [header.map(esc).join(','), ...body].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `pickle-finance-${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast(`已匯出 ${rows.length} 筆財務紀錄`);
+      }
+
+      async function viewSession(session) {
+        selectedSession.value = session;
+        publicRoster.value = [];
+        subView.value = 'session';
+        rosterLoading.value = true;
+        const { data, error } = await sb.rpc('get_public_session_roster', { p_session_id: session.id });
+        rosterLoading.value = false;
+        if (error) { showToast(`名單載入失敗：${error.message}`); return; }
+        publicRoster.value = data || [];
+      }
+
+      function closeSubView() {
+        subView.value = null;
+        selectedSession.value = null;
+        adminSelectedSession.value = null;
+        adminRoster.value = [];
+      }
+
+      function goTab(tab) {
+        if (tab === 'records' && !user.value) {
+          activeTab.value = 'records';
+          return;
+        }
+        if (tab === 'admin' && profile.value?.role !== 'admin') return;
+        activeTab.value = tab;
+        if (tab === 'records' && user.value) loadMyData(true);
+        if (tab === 'admin') {
+          loadAdminSessions();
+          if (adminMode.value === 'finance') loadAdminFinance(true);
+        }
+      }
+
+      function openAuth(mode = 'login') {
+        authMode.value = mode;
+        authError.value = '';
+        authForm.value = { phone: '', nickname: '', password: '' };
+        showPassword.value = false;
+        showAuth.value = true;
+      }
+
+      function switchAuthMode() {
+        authMode.value = authMode.value === 'login' ? 'register' : 'login';
+        authError.value = '';
+        showPassword.value = false;
+      }
+
+      async function ensureEmailProviderEnabled() {
+        try {
+          const response = await fetch(`${SUPABASE_URL}/auth/v1/settings`, {
+            headers: { apikey: SUPABASE_PUBLISHABLE_KEY }
+          });
+          if (!response.ok) return;
+          const settings = await response.json();
+          if (settings?.external && settings.external.email === false) {
+            const error = new Error('EMAIL_PROVIDER_DISABLED');
+            error.code = 'EMAIL_PROVIDER_DISABLED';
+            throw error;
+          }
+        } catch (error) {
+          if (error?.code === 'EMAIL_PROVIDER_DISABLED' || error?.message === 'EMAIL_PROVIDER_DISABLED') throw error;
+          // Settings probe failure should not block a normal auth request.
+        }
+      }
+
+      async function submitAuth() {
+        authError.value = '';
+        authLoading.value = true;
+        try {
+          await ensureEmailProviderEnabled();
+          const phone = normalizePhone(authForm.value.phone);
+          if (!authForm.value.password || authForm.value.password.length < 8) throw new Error('密碼至少需要 8 碼');
+          const email = internalEmail(phone);
+
+          if (authMode.value === 'login') {
+            const { data, error } = await sb.auth.signInWithPassword({ email, password: authForm.value.password });
+            if (error) throw error;
+            user.value = data.user;
+          } else {
+            if (!authForm.value.nickname) throw new Error('請輸入球場暱稱');
+            const { data, error } = await sb.auth.signUp({ email, password: authForm.value.password });
+            if (error) throw error;
+            if (!data.session || !data.user) throw new Error('帳號建立後尚未取得登入狀態，請確認 Email confirmations 已關閉');
+            user.value = data.user;
+            const { error: claimError } = await sb.rpc('claim_player_profile', { p_phone: phone, p_nickname: authForm.value.nickname });
+            if (claimError) throw claimError;
+          }
+
+          await loadProfile();
+          showAuth.value = false;
+          await loadMyData(true);
+          if (profile.value?.role === 'admin') await loadAdminSessions();
+          showToast(authMode.value === 'login' ? '登入成功' : '帳號建立完成，歷史紀錄已同步');
+        } catch (e) {
+          authError.value = readableAuthError(e);
+        } finally {
+          authLoading.value = false;
+        }
+      }
+
+      function readableAuthError(error) {
+        const msg = error?.message || String(error || '發生錯誤');
+        if (error?.code === 'EMAIL_PROVIDER_DISABLED' || /email.*(login|provider).*disabled|email logins are disabled/i.test(msg)) {
+          return 'Supabase 的 Email 登入尚未啟用。請到 Authentication → Providers → Email，確認 Enable email provider 已開啟。';
+        }
+        if (/invalid login credentials/i.test(msg)) return '手機或密碼不正確，請確認使用建立帳號時設定的密碼。';
+        if (/email not confirmed/i.test(msg)) return '這個帳號尚未完成確認，請檢查 Supabase 的 Email confirmations 設定。';
+        if (/already registered|already been registered|user already registered/i.test(msg)) return '這支手機已經建立過帳號，請直接登入';
+        if (/failed to fetch|networkerror|network request failed/i.test(msg)) return '無法連線到登入服務。建議使用 Live Server 開啟此 HTML 後再試一次。';
+        if (/invalid api key|api key/i.test(msg)) return 'Supabase 前端連線金鑰無效，請重新整理後再試一次。';
+        return msg;
+      }
+
+      async function logout() {
+        await sb.auth.signOut();
+        user.value = null;
+        profile.value = null;
+        showProfile.value = false;
+        activeTab.value = 'home';
+        myBookings.value = [];
+        myFinance.value = [];
+        packageBalance.value = 0;
+        showToast('已登出');
+      }
+
+      function startBooking(session) {
+        if (!user.value || !profile.value) {
+          openAuth('login');
+          return;
+        }
+        selectedSession.value = session;
+        bookingError.value = '';
+        setBookingMode('self');
+        showBooking.value = true;
+      }
+
+      function setBookingMode(mode) {
+        bookingForm.value.mode = mode;
+        if (mode === 'self') {
+          bookingForm.value.nickname = profile.value?.nickname || '';
+          bookingForm.value.phone = profile.value?.phone || '';
+        } else {
+          bookingForm.value.nickname = '';
+          bookingForm.value.phone = '';
+        }
+      }
+
+      async function submitBooking() {
+        bookingError.value = '';
+        bookingLoading.value = true;
+        try {
+          if (!bookingForm.value.nickname) throw new Error('請輸入參加者暱稱');
+          const phone = normalizePhone(bookingForm.value.phone);
+          const { error } = await sb.rpc('create_booking_for_phone', {
+            p_session_id: selectedSession.value.id,
+            p_phone: phone,
+            p_nickname: bookingForm.value.nickname
+          });
+          if (error) throw error;
+          showBooking.value = false;
+          await Promise.all([loadPublicSessions(), loadMyData(true)]);
+          const refreshed = publicSessions.value.find(s => s.id === selectedSession.value.id);
+          if (refreshed) selectedSession.value = refreshed;
+          if (subView.value === 'session') {
+            const roster = await sb.rpc('get_public_session_roster', { p_session_id: selectedSession.value.id });
+            if (!roster.error) publicRoster.value = roster.data || [];
+          }
+          showToast(bookingForm.value.mode === 'self' ? '報名成功，等待主辦方確認收款' : '已成功幫朋友報名');
+        } catch (e) {
+          bookingError.value = e?.message || String(e);
+        } finally {
+          bookingLoading.value = false;
+        }
+      }
+
+      async function cancelMyBooking(row) {
+        if (!confirm(`確定取消 ${formatDateShort(row.start_at)} 的報名嗎？`)) return;
+        const { error } = await sb.rpc('cancel_booking', { p_booking_id: row.booking_id });
+        if (error) { showToast(error.message); return; }
+        await Promise.all([loadMyData(true), loadPublicSessions()]);
+        showToast('已取消報名');
+      }
+
+      function openSubstitute(row) {
+        substituteTarget.value = row;
+        substituteForm.value = { nickname: '', phone: '', note: '' };
+        showSubstitute.value = true;
+      }
+
+      async function submitSubstitute() {
+        substituteLoading.value = true;
+        try {
+          const phone = normalizePhone(substituteForm.value.phone);
+          if (!substituteForm.value.nickname) throw new Error('請輸入新參加者暱稱');
+          const { error } = await sb.rpc('change_booking_participant', {
+            p_booking_id: substituteTarget.value.booking_id,
+            p_phone: phone,
+            p_nickname: substituteForm.value.nickname,
+            p_note: substituteForm.value.note || null
+          });
+          if (error) throw error;
+          showSubstitute.value = false;
+          await Promise.all([loadMyData(true), loadPublicSessions()]);
+          showToast('參加者已更新');
+        } catch (e) {
+          showToast(e?.message || String(e));
+        } finally {
+          substituteLoading.value = false;
+        }
+      }
+
+      function openProfile() {
+        if (!profile.value) return;
+        profileError.value = '';
+        profileForm.value = {
+          nickname: profile.value.nickname || '',
+          phone: profile.value.phone || '',
+          hasDupr: !!profile.value.has_dupr,
+          duprId: profile.value.dupr_id || ''
         };
-        return map[status];
-      };
-      const bookingStatusText = (status) => {
-        const map = {
-          registered: '已報名',
-          paid: '已報名',
-          waitlisted: '候補中',
-          sub_pending: '代打確認中',
-          substituted: '已交接',
-          cancelled: '已取消'
-        };
-        return map[status];
-      };
+        showProfile.value = true;
+      }
 
-      // --- 管理員端 (Admin) 計算屬性與邏輯 ---
-      const totalValidRegistrations = computed(() => {
-        return mockBookings.value.filter(b => b.status === 'registered' || b.status === 'paid' || b.status === 'substituted').length;
-      });
-      const pendingPaymentsCount = computed(() => {
-        return mockBookings.value.filter(b => b.status === 'registered' && b.paymentStatus === 'unpaid').length;
-      });
-      const pendingSubsCount = computed(() => {
-        return mockBookings.value.filter(b => b.status === 'sub_pending').length;
-      });
+      async function saveProfile() {
+        profileError.value = '';
+        profileLoading.value = true;
+        try {
+          if (!profileForm.value.nickname) throw new Error('暱稱不能空白');
+          const newPhone = normalizePhone(profileForm.value.phone);
+          const phoneChanged = newPhone !== profile.value.phone;
 
-      const getPendingForSession = (sessionId) => {
-        const sessionBookings = mockBookings.value.filter(b => b.sessionId === sessionId);
-        return {
-          sub: sessionBookings.filter(b => b.status === 'sub_pending').length,
-          pay: sessionBookings.filter(b => b.status === 'registered' && b.paymentStatus === 'unpaid').length
-        };
-      };
+          const { error: profileUpdateError } = await sb.rpc('update_my_profile', {
+            p_nickname: profileForm.value.nickname,
+            p_has_dupr: profileForm.value.hasDupr,
+            p_dupr_id: profileForm.value.hasDupr ? (profileForm.value.duprId || null) : null
+          });
+          if (profileUpdateError) throw profileUpdateError;
 
-      const openAdminSessionDetail = (session) => {
+          if (phoneChanged) {
+            const { data, error } = await sb.functions.invoke('change-phone', { body: { phone: newPhone } });
+            if (error) throw error;
+            if (data?.error) throw new Error(data.error);
+          }
+
+          await loadProfile();
+          showProfile.value = false;
+          showToast(phoneChanged ? '資料已更新；下次請用新手機登入' : '個人資料已更新');
+        } catch (e) {
+          profileError.value = e?.message || String(e);
+        } finally {
+          profileLoading.value = false;
+        }
+      }
+
+      async function openAdminSession(session) {
         adminSelectedSession.value = session;
-        adminCurrentView.value = 'sessions';
-      };
+        subView.value = 'adminSession';
+        adminRosterLoading.value = true;
+        const { data, error } = await sb.rpc('get_admin_session_roster', { p_session_id: session.session_id });
+        adminRosterLoading.value = false;
+        if (error) { showToast(error.message); return; }
+        adminRoster.value = data || [];
+      }
 
-      const getBookingsForSession = (sessionId) => {
-        return mockBookings.value.filter(b => b.sessionId === sessionId);
-      };
+      async function refreshAdminDetail() {
+        if (!adminSelectedSession.value) return;
+        await loadAdminSessions();
+        const updated = adminSessions.value.find(s => s.session_id === adminSelectedSession.value.session_id);
+        if (updated) adminSelectedSession.value = updated;
+        const { data, error } = await sb.rpc('get_admin_session_roster', { p_session_id: adminSelectedSession.value.session_id });
+        if (!error) adminRoster.value = data || [];
+      }
 
-      const togglePayment = (b) => {
-        // Audit 軌跡邏輯：切換時更新底層付款與報名綜合狀態
-        b.paymentStatus = b.paymentStatus === 'paid' ? 'unpaid' : 'paid';
-        if(b.paymentStatus === 'paid' && b.status === 'registered') {
-          b.status = 'paid';
-        } else if (b.paymentStatus === 'unpaid' && b.status === 'paid') {
-          b.status = 'registered';
+      async function confirmFinance(row) {
+        adminActionLoading.value = true;
+        try {
+          const { error } = await sb.rpc('confirm_financial_entry', { p_entry_id: row.financial_entry_id });
+          if (error) throw error;
+          await refreshAdminDetail();
+          showToast('已確認收款');
+        } catch (e) { showToast(e?.message || String(e)); }
+        finally { adminActionLoading.value = false; }
+      }
+
+      async function reopenFinance(row) {
+        if (!confirm(`將 ${row.nickname} 的收款狀態改回待確認？`)) return;
+        adminActionLoading.value = true;
+        try {
+          const { error } = await sb.rpc('reopen_financial_entry', { p_entry_id: row.financial_entry_id });
+          if (error) throw error;
+          await refreshAdminDetail();
+          showToast('已改回待確認');
+        } catch (e) { showToast(e?.message || String(e)); }
+        finally { adminActionLoading.value = false; }
+      }
+
+      async function openFinanceEdit(row) {
+        financeEditTarget.value = { ...row, entryId: row.financial_entry_id };
+        financeEditForm.value = { amount: Number(row.amount || 0), packageDelta: Number(row.package_delta || 0), note: row.financial_note || '' };
+        showFinanceEdit.value = true;
+      }
+
+      async function saveFinanceEdit() {
+        adminActionLoading.value = true;
+        try {
+          const { error } = await sb.rpc('update_pending_financial_entry', {
+            p_entry_id: financeEditTarget.value.entryId,
+            p_amount: Number(financeEditForm.value.amount || 0),
+            p_package_delta: Number(financeEditForm.value.packageDelta || 0),
+            p_note: financeEditForm.value.note || null
+          });
+          if (error) throw error;
+          showFinanceEdit.value = false;
+          await refreshAdminDetail();
+          showToast('待確認內容已更新');
+        } catch (e) { showToast(e?.message || String(e)); }
+        finally { adminActionLoading.value = false; }
+      }
+
+      async function settleCurrentSession() {
+        if (!confirm('確認本場名單與費用皆已核對完成，並正式結算？\n\n結算後原始紀錄不可直接修改。')) return;
+        adminActionLoading.value = true;
+        const { error } = await sb.rpc('settle_session', { p_session_id: adminSelectedSession.value.session_id, p_settlement_note: '由管理端完成結算' });
+        adminActionLoading.value = false;
+        if (error) { showToast(error.message); return; }
+        await Promise.all([refreshAdminDetail(), loadPublicSessions()]);
+        showToast('場次已完成結算');
+      }
+
+      function toIsoOrNull(value) {
+        return value ? new Date(value).toISOString() : null;
+      }
+
+      async function createSession() {
+        adminActionLoading.value = true;
+        try {
+          if (!sessionForm.value.start || !sessionForm.value.end || !sessionForm.value.venue) throw new Error('開始、結束時間與場地為必填');
+          const payload = {
+            start_at: new Date(sessionForm.value.start).toISOString(),
+            end_at: new Date(sessionForm.value.end).toISOString(),
+            venue: sessionForm.value.venue,
+            category: sessionForm.value.category || '一般場',
+            capacity: Number(sessionForm.value.capacity || 10),
+            default_price: Number(sessionForm.value.price || 0),
+            default_package_units: Number(sessionForm.value.units || 0),
+            registration_deadline: toIsoOrNull(sessionForm.value.registrationDeadline),
+            cancel_deadline: toIsoOrNull(sessionForm.value.cancelDeadline),
+            status: 'open',
+            public_note: sessionForm.value.publicNote || null,
+            internal_note: sessionForm.value.internalNote || null,
+            created_by: profile.value.id
+          };
+          const { error } = await sb.from('sessions').insert(payload);
+          if (error) throw error;
+          showCreateSession.value = false;
+          sessionForm.value = { start: '', end: '', venue: '', category: '一般場', capacity: 10, price: 500, units: 1, registrationDeadline: '', cancelDeadline: '', publicNote: '', internalNote: '' };
+          await Promise.all([loadAdminSessions(), loadPublicSessions()]);
+          showToast('新場次已建立並開放報名');
+        } catch (e) { showToast(e?.message || String(e)); }
+        finally { adminActionLoading.value = false; }
+      }
+
+      onMounted(async () => {
+        await Promise.all([refreshAuthState(), loadPublicSessions()]);
+        if (user.value && profile.value) {
+          await loadMyData(true);
+          if (profile.value.role === 'admin') {
+            await Promise.all([loadAdminSessions(), loadAdminFinance(true)]);
+          }
         }
-      };
-
-      const confirmSub = (b) => {
-        if(confirm(`確認將此名額交接給「${b.subName}」？\n\n註：系統將沿用原報名者之收款狀態，以利帳務核對。`)) {
-          b.status = 'substituted';
-        }
-      };
+        sb.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_OUT') return;
+          user.value = session?.user || null;
+        });
+        booting.value = false;
+      });
 
       return {
-        currentRole, switchRole,
-        playerCurrentView, goBack,
-        playerProfile, currentFilter, filterOptions,
-        mockSessions, filteredSessions, viewDetail, selectedSession,
-        sessionStatusClass, sessionStatusText,
-        showBookingConfirm, openBookingConfirm, submitBooking,
-        myBookingsList, bookingStatusForSelected,
-        bookingStatusStyle, bookingStatusText,
-        showProfileModal, showSubModal, openSubModal, subForm, submitSub,
-        cancelBooking, toastMsg,
-        
-        adminCurrentView, totalValidRegistrations, pendingPaymentsCount, pendingSubsCount,
-        getPendingForSession, openAdminSessionDetail, adminSelectedSession, getBookingsForSession,
-        togglePayment, confirmSub
-      }
+        booting, user, profile, activeTab, subView, toast,
+        publicSessions, sessionsLoading, filteredPublicSessions, SESSION_PLACEHOLDER_IMAGE,
+        selectedSession, publicRoster, rosterLoading, canBookSelectedSession,
+        showAuth, authMode, authLoading, authError, authForm, showPassword,
+        showBooking, bookingLoading, bookingError, bookingForm,
+        recordsMode, recordsLoading, myBookings, myFinance, packageBalance,
+        myBookingsHasMore, myFinanceHasMore,
+        showProfile, profileLoading, profileError, profileForm,
+        showSubstitute, substituteLoading, substituteForm,
+        adminMode, adminSessions, adminSelectedSession, adminRoster, adminRosterLoading,
+        adminActionLoading, adminFinance, adminFinanceHasMore, financeFilter,
+        showFinanceEdit, financeEditForm, showCreateSession, sessionForm,
+        money, signedUnits, formatDateShort, formatDateLong, formatTimeRange, formatDateTime, formatDeadline,
+        sessionProgress, sessionStatusText, sessionStatusClass, sessionDbStatusText,
+        showToast, loadPublicSessions, viewSession, closeSubView, goTab,
+        openAuth, switchAuthMode, submitAuth, logout,
+        startBooking, setBookingMode, submitBooking,
+        loadMyData, loadMoreBookings, loadMoreFinance,
+        cancelMyBooking, openSubstitute, submitSubstitute,
+        openProfile, saveProfile,
+        openAdminSession, confirmFinance, reopenFinance, openFinanceEdit, saveFinanceEdit,
+        settleCurrentSession, openAdminFinance, loadAdminFinance, loadMoreAdminFinance, exportFinanceCsv, createSession
+      };
     }
-  }).mount('#app')
+  }).mount('#app');
 </script>
 </body>
 </html>
