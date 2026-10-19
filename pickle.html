@@ -115,7 +115,7 @@
         <section v-if="subView === 'session' && selectedSession" key="session-detail" class="px-4 py-5">
           <div class="glass-surface rounded-[22px] border border-white/60 shadow-card overflow-hidden">
             <div class="aspect-[16/9] bg-sky-50 overflow-hidden border-b border-white/60">
-              <img :src="SESSION_PLACEHOLDER_IMAGE" alt="球敘場次示意圖" class="w-full h-full object-cover">
+              <img :src="sessionImageUrl(selectedSession)" alt="球敘場次照片" class="w-full h-full object-cover">
             </div>
             <div class="p-5 border-b border-brand-100">
               <div class="flex items-start justify-between gap-4">
@@ -175,7 +175,10 @@
             <div v-else class="divide-y divide-gray-100">
               <div v-for="(row, index) in publicRoster" :key="row.booking_id" class="py-3 flex items-center gap-3">
                 <div class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-[14px] font-bold">{{ index + 1 }}</div>
-                <div class="font-semibold flex-1 min-w-0 truncate">{{ row.nickname }}</div>
+                <div class="font-semibold flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
+                  <span class="truncate">{{ row.nickname }}</span>
+                  <span v-if="row.dupr_rating != null" class="shrink-0 text-[10px] leading-none rounded-full bg-gray-100 text-gray-500 px-1.5 py-1 font-medium">{{ formatDupr(row.dupr_rating) }}</span>
+                </div>
                 <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.payment_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">
                   {{ row.payment_status === 'confirmed' ? '已收款' : '待確認' }}
                 </span>
@@ -199,10 +202,16 @@
           <div class="glass-surface rounded-[22px] border border-white/60 shadow-card p-5">
             <div class="flex justify-between gap-4 items-start">
               <div>
-                <div class="text-[14px] font-bold text-brand-600 mb-1">{{ adminSelectedSession.category }}</div>
+                <div class="text-[14px] font-bold text-brand-600 mb-1 flex items-center gap-1.5">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <span>{{ adminSelectedSession.venue }}</span>
+                </div>
                 <h1 class="text-[24px] font-bold leading-tight">{{ formatDateLong(adminSelectedSession.start_at) }}</h1>
                 <div class="text-[17px] font-semibold mt-1">{{ formatTimeRange(adminSelectedSession.start_at, adminSelectedSession.end_at) }}</div>
-                <div class="text-muted mt-2">{{ adminSelectedSession.venue }}</div>
+                <div class="data-text text-muted mt-2 flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                  <span>{{ adminSelectedSession.category }}</span>
+                </div>
               </div>
               <span class="rounded-full px-3 py-1.5 text-[13px] font-bold" :class="['settled','cancelled'].includes(adminSelectedSession.status) ? 'bg-gray-100 text-gray-600' : 'bg-brand-50 text-brand-700'">{{ sessionDbStatusText(adminSelectedSession.status) }}</span>
             </div>
@@ -222,7 +231,24 @@
               </div>
             </div>
 
-            <div v-if="adminSelectedSession.internal_note" class="mt-4 rounded-2xl bg-gray-50 border border-gray-100 p-4 data-text">
+            <div v-if="adminSelectedSession.status === 'settled'" class="mt-4 rounded-2xl bg-gray-50 border border-gray-100 p-4 data-text">
+              <div class="flex items-center justify-between gap-3">
+                <div class="font-bold">內部備註</div>
+                <button v-if="!settledNoteEditing" @click="startSettledNoteEdit" class="min-h-0 h-8 px-2.5 rounded-lg bg-white border border-line text-[12px] font-bold text-gray-500 inline-flex items-center gap-1.5">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                  編輯
+                </button>
+              </div>
+              <div v-if="!settledNoteEditing" class="text-gray-600 whitespace-pre-line mt-1">{{ adminSelectedSession.internal_note || '尚無內部備註' }}</div>
+              <div v-else class="mt-3">
+                <textarea v-model="settledNoteDraft" rows="3" class="w-full rounded-xl border border-line p-3 resize-none bg-white" placeholder="僅管理員可見"></textarea>
+                <div class="mt-2 flex gap-2 justify-end">
+                  <button @click="cancelSettledNoteEdit" :disabled="settledNoteSaving" class="min-h-0 h-9 px-3 rounded-lg border border-line bg-white text-[13px] font-bold text-gray-500">取消</button>
+                  <button @click="saveSettledInternalNote" :disabled="settledNoteSaving" class="min-h-0 h-9 px-3 rounded-lg bg-brand-500 text-white text-[13px] font-bold disabled:opacity-50">{{ settledNoteSaving ? '儲存中…' : '儲存備註' }}</button>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="adminSelectedSession.internal_note" class="mt-4 rounded-2xl bg-gray-50 border border-gray-100 p-4 data-text">
               <div class="font-bold mb-1">內部備註</div>
               <div class="text-gray-600 whitespace-pre-line">{{ adminSelectedSession.internal_note }}</div>
             </div>
@@ -256,38 +282,33 @@
                   <div class="min-w-0">
                     <div class="font-bold text-[17px] flex items-center gap-2 flex-wrap">
                       <span>{{ row.nickname }}</span>
-                      <span v-if="row.has_dupr" class="text-[12px] rounded-full bg-gray-100 text-gray-600 px-2 py-0.5">DUPR</span>
+                      <span v-if="row.dupr_rating != null" class="text-[10px] leading-none rounded-full bg-gray-100 text-gray-500 px-1.5 py-1 font-medium">{{ formatDupr(row.dupr_rating) }}</span>
                     </div>
                     <div class="data-text text-muted mt-1">{{ row.phone }}</div>
                     <div v-if="row.original_player !== row.nickname" class="text-[14px] text-muted mt-1">原報名：{{ row.original_player }}</div>
-                    <div v-if="row.booked_by" class="text-[14px] text-muted mt-1">操作報名：{{ row.booked_by }}</div>
+                    <div v-if="row.booked_by && row.booked_by !== row.nickname" class="text-[12px] text-gray-400 mt-1">代報：{{ row.booked_by }}</div>
+                    <div v-if="row.operator" class="text-[12px] text-gray-400 mt-1">審核：{{ row.operator }}</div>
                   </div>
                   <span class="shrink-0 text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.booking_status === 'cancelled' ? 'bg-gray-100 text-gray-500' : (row.financial_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')">
                     {{ row.booking_status === 'cancelled' ? '已取消' : (row.financial_status === 'confirmed' ? '已收款' : '待確認') }}
                   </span>
                 </div>
 
-                <div class="mt-4 rounded-2xl bg-gray-50 p-4 data-text">
-                  <template v-if="row.financial_entry_id">
-                    <div class="flex justify-between gap-4">
-                      <span class="text-muted">金額</span>
-                      <span class="font-semibold">NT$ {{ money(row.amount || 0) }}</span>
-                    </div>
-                    <div class="flex justify-between gap-4 mt-2">
-                      <span class="text-muted">套票次數</span>
-                      <span class="font-semibold">{{ signedUnits(row.package_delta || 0) }}</span>
-                    </div>
-                  </template>
-                  <div v-else class="text-muted">未保留待確認財務紀錄</div>
-                  <div v-if="row.operator" class="flex justify-between gap-4 mt-2">
-                    <span class="text-muted">操作者</span>
-                    <span class="font-semibold text-right">{{ row.operator }}</span>
+                <div v-if="row.financial_entry_id && (Number(row.amount || 0) !== 0 || Number(row.package_delta || 0) !== 0 || row.financial_note)" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text">
+                  <div v-if="Number(row.amount || 0) !== 0" class="flex justify-between gap-4">
+                    <span class="text-muted">金額</span>
+                    <span class="font-semibold">NT$ {{ money(row.amount) }}</span>
                   </div>
-                  <div v-if="row.financial_note" class="flex justify-between gap-4 mt-2">
+                  <div v-else-if="Number(row.package_delta || 0) !== 0" class="flex justify-between gap-4">
+                    <span class="text-muted">套票次數</span>
+                    <span class="font-semibold">{{ Math.abs(Number(row.package_delta)) }} 次</span>
+                  </div>
+                  <div v-if="row.financial_note" class="flex justify-between gap-4" :class="(Number(row.amount || 0) !== 0 || Number(row.package_delta || 0) !== 0) ? 'mt-2' : ''">
                     <span class="text-muted">備註</span>
                     <span class="font-medium text-right">{{ row.financial_note }}</span>
                   </div>
                 </div>
+                <div v-else-if="!row.financial_entry_id" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text text-muted">未保留待確認財務紀錄</div>
 
                 <div v-if="adminSelectedSession.status === 'open' && row.booking_status === 'active'" class="mt-3">
                   <div class="flex gap-2">
@@ -316,7 +337,7 @@
           <!-- HOME -->
           <div v-if="activeTab === 'home'" class="px-4 py-5">
             <div class="rounded-[22px] bg-gradient-to-br from-brand-500 to-brand-700 text-white p-5 shadow-card">
-              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2.5 py-1 text-[13px] font-bold tracking-wide">v1.0.11</span>
+              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2.5 py-1 text-[13px] font-bold tracking-wide">v1.0.18</span>
               <h1 class="text-[27px] font-bold leading-tight mt-3">近期球敘</h1>
             </div>
 
@@ -324,12 +345,15 @@
             <div v-else class="mt-4 flex flex-col gap-4">
               <article v-for="session in filteredPublicSessions" :key="session.id" class="glass-surface rounded-[22px] border border-white/60 shadow-card overflow-hidden">
                 <div class="aspect-[16/9] bg-sky-50 overflow-hidden border-b border-white/60">
-                  <img :src="SESSION_PLACEHOLDER_IMAGE" alt="球敘場次示意圖" class="w-full h-full object-cover">
+                  <img :src="sessionImageUrl(session)" alt="球敘場次照片" class="w-full h-full object-cover">
                 </div>
                 <div class="p-5">
                 <div class="flex items-start justify-between gap-4">
                   <div>
-                    <div class="text-[14px] font-bold text-brand-600 mb-1">{{ session.category }}</div>
+                    <div class="text-[14px] font-bold text-brand-600 mb-1 flex items-center gap-1.5">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                      <span>{{ session.venue }}</span>
+                    </div>
                     <div class="text-[22px] font-bold tracking-tight">{{ formatDateShort(session.start_at) }}</div>
                     <div class="text-[17px] font-semibold mt-1">{{ formatTimeRange(session.start_at, session.end_at) }}</div>
                   </div>
@@ -338,8 +362,8 @@
 
                 <div class="mt-4 data-text text-gray-600 flex flex-col gap-2">
                   <div class="flex items-center gap-2">
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    <span>{{ session.venue }}</span>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>{{ session.category }}</span>
                   </div>
                   <div class="flex items-center gap-2 text-brand-700 font-semibold">
                     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
@@ -364,6 +388,7 @@
               <div v-if="filteredPublicSessions.length === 0" class="rounded-[22px] border border-dashed border-gray-300 bg-white p-10 text-center text-muted">
                 目前沒有符合條件的場次
               </div>
+              <button v-if="publicSessionsHasMore" @click="loadMorePublicSessions" class="w-full rounded-xl border border-line bg-white font-bold py-3">顯示更多場次</button>
             </div>
           </div>
 
@@ -374,7 +399,6 @@
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
               <h2 class="text-[22px] font-bold mt-4">登入後查看你的紀錄</h2>
-              <p class="text-muted leading-7 mt-2">包含報名、付款狀態、套票餘額與歷史紀錄。</p>
               <button @click="openAuth('login')" class="mt-5 w-full rounded-xl bg-brand-500 text-white font-bold py-3">手機＋密碼登入</button>
               <button @click="openAuth('register')" class="mt-2 w-full rounded-xl border border-line bg-white font-bold py-3">建立帳號</button>
             </div>
@@ -403,14 +427,20 @@
                 <article v-for="row in myBookings" :key="row.booking_id" class="glass-surface rounded-[22px] border border-white/60 shadow-card p-5">
                   <div class="flex items-start justify-between gap-4">
                     <div>
-                      <div class="text-[14px] font-bold text-brand-600">{{ row.category }}</div>
+                      <div class="text-[14px] font-bold text-brand-600 flex items-center gap-1.5">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <span>{{ row.venue }}</span>
+                      </div>
                       <div class="font-bold text-[20px] mt-1">{{ formatDateShort(row.start_at) }}</div>
                       <div class="text-[16px] font-semibold mt-1">{{ formatTimeRange(row.start_at, row.end_at) }}</div>
                     </div>
                     <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.payment_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">{{ row.payment_status === 'confirmed' ? '已收款' : '待確認' }}</span>
                   </div>
-                  <div class="data-text text-muted mt-3">{{ row.venue }}</div>
-                  <div v-if="!row.is_my_participation" class="mt-3 rounded-xl bg-brand-50 px-3 py-2 data-text text-brand-700 font-semibold">代報參加者：{{ row.participant_nickname }}</div>
+                  <div class="data-text text-muted mt-3 flex items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                    <span>{{ row.category }}</span>
+                  </div>
+                  <div v-if="!row.is_my_participation" class="mt-3 rounded-xl bg-brand-50 px-3 py-2 data-text text-brand-700 font-semibold">代報：{{ row.participant_nickname }}</div>
 
                   <div class="mt-4 rounded-2xl bg-gray-50 p-4 data-text">
                     <div class="flex justify-between"><span class="text-muted">金額</span><span class="font-semibold">NT$ {{ money(row.amount || 0) }}</span></div>
@@ -437,7 +467,7 @@
                     <table class="w-full min-w-[720px] text-left text-[15px]">
                       <thead class="bg-[#FFF9F3] text-gray-600 border-b border-brand-100">
                         <tr>
-                          <th class="px-3 py-3 font-semibold whitespace-nowrap">日期</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap">時間</th>
                           <th class="px-3 py-3 font-semibold min-w-[180px]">備註</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">金額</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">套票</th>
@@ -506,10 +536,16 @@
                 <article v-for="session in adminSessions" :key="session.session_id" class="glass-surface rounded-[22px] border border-white/60 shadow-card p-5">
                   <div class="flex justify-between gap-4 items-start">
                     <div>
-                      <div class="text-[14px] font-bold text-brand-600">{{ session.category }}</div>
+                      <div class="text-[14px] font-bold text-brand-600 flex items-center gap-1.5">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <span>{{ session.venue }}</span>
+                      </div>
                       <div class="font-bold text-[21px] mt-1">{{ formatDateShort(session.start_at) }}</div>
                       <div class="font-semibold mt-1">{{ formatTimeRange(session.start_at, session.end_at) }}</div>
-                      <div class="data-text text-muted mt-2">{{ session.venue }}</div>
+                      <div class="data-text text-muted mt-2 flex items-center gap-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+                        <span>{{ session.category }}</span>
+                      </div>
                     </div>
                     <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="['settled','cancelled'].includes(session.status) ? 'bg-gray-100 text-gray-600' : 'bg-brand-50 text-brand-700'">{{ sessionDbStatusText(session.status) }}</span>
                   </div>
@@ -527,6 +563,7 @@
                   >{{ ['settled','cancelled'].includes(session.status) ? '檢視名單' : '檢視與處理名單' }}</button>
                 </article>
                 <div v-if="adminSessions.length === 0" class="rounded-[22px] border border-dashed border-gray-300 bg-white p-10 text-center text-muted">目前沒有場次</div>
+                <button v-if="adminSessionsHasMore" @click="loadMoreAdminSessions" class="w-full rounded-xl border border-line bg-white font-bold py-3">顯示更多場次</button>
               </div>
 
               <div v-else-if="adminMode === 'players'" class="mt-4">
@@ -534,10 +571,9 @@
                   <div class="flex items-center justify-between gap-3">
                     <div>
                       <div class="font-bold text-[19px]">球友與套票</div>
-                      <div class="text-[13px] text-muted mt-1">手機號碼為主要識別</div>
                     </div>
                     <button @click="openPackagePlans" class="min-h-0 h-10 px-3 rounded-xl border border-brand-200 bg-white/80 text-brand-700 font-bold text-[14px] inline-flex items-center gap-2 backdrop-blur-md shadow-sm">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4V7z"/><path d="M13 5v2M13 11v2M13 17v2"/></svg>
                       <span>套票方案</span>
                     </button>
                   </div>
@@ -563,7 +599,7 @@
                             <div class="font-bold text-[18px] truncate">{{ row.nickname }}</div>
                             <span class="text-[12px] rounded-full px-2 py-0.5 font-bold" :class="row.is_registered ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'">{{ row.is_registered ? '已註冊' : '未註冊' }}</span>
                             <span v-if="row.account_status === 'disabled'" class="text-[12px] rounded-full px-2 py-0.5 font-bold bg-red-50 text-red-600">已停用</span>
-                            <span v-if="row.has_dupr" class="text-[12px] rounded-full px-2 py-0.5 bg-brand-50 text-brand-700 font-bold">DUPR</span>
+                            <span v-if="row.dupr_rating != null" class="text-[10px] leading-none rounded-full px-1.5 py-1 bg-gray-100 text-gray-500 font-medium">{{ formatDupr(row.dupr_rating) }}</span>
                           </div>
                           <div class="text-[15px] text-muted mt-1">{{ row.phone }}</div>
                           <div class="text-[13px] text-muted mt-2">歷史報名 {{ row.booking_count }} 場<span v-if="row.last_booking_at"> · 最近 {{ formatDateShort(row.last_booking_at) }}</span></div>
@@ -599,21 +635,20 @@
                 </div>
 
                 <div class="mt-4 bg-white rounded-[18px] border border-line overflow-hidden">
-                  <div class="px-4 py-3 border-b border-line flex items-center justify-between gap-3">
+                  <div class="px-4 py-3 border-b border-line">
                     <div class="font-bold">財務紀錄</div>
-                    <div class="text-[13px] text-muted">最新 {{ adminFinance.length }} 筆</div>
                   </div>
                   <div v-if="adminFinance.length" class="overflow-x-auto app-scroll">
                     <table class="w-full min-w-[860px] text-left text-[15px]">
                       <thead class="bg-[#FFF9F3] text-gray-600 border-b border-brand-100">
                         <tr>
-                          <th class="px-3 py-3 font-semibold whitespace-nowrap">日期</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap">時間</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap">球友</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">套票餘額</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">金額</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">套票次數</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap">狀態</th>
-                          <th class="px-3 py-3 font-semibold whitespace-nowrap">操作者</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap">審核</th>
                           <th class="px-3 py-3 font-semibold min-w-[180px]">備註</th>
                         </tr>
                       </thead>
@@ -628,7 +663,7 @@
                           <td class="px-3 py-3 text-right font-bold text-ink whitespace-nowrap">NT$ {{ money(row.amount || 0) }}</td>
                           <td class="px-3 py-3 text-right font-medium">{{ signedUnits(row.package_delta) }}</td>
                           <td class="px-3 py-3 whitespace-nowrap">{{ row.status === 'confirmed' ? '已確認' : '待確認' }}</td>
-                          <td class="px-3 py-3 whitespace-nowrap">{{ row.operator || '—' }}</td>
+                          <td class="px-3 py-3 whitespace-nowrap text-[13px] text-gray-400">{{ row.operator || '—' }}</td>
                           <td class="px-3 py-3 text-gray-600">{{ row.note || '—' }}<span v-if="row.venue"> · {{ row.venue }}</span></td>
                         </tr>
                       </tbody>
@@ -751,10 +786,11 @@
               <button @click="setBookingMode('friend')" class="flex-1 h-11 min-h-0 rounded-lg font-bold text-[15px]" :class="bookingForm.mode === 'friend' ? 'bg-white shadow-sm' : 'text-muted'">幫朋友報名</button>
             </div>
 
+            <div v-if="bookingError" class="mt-4 rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 data-text">{{ bookingError }}</div>
+
             <div class="mt-4 flex flex-col gap-4">
               <div><label class="font-bold block mb-2">參加者暱稱</label><input v-model.trim="bookingForm.nickname" :readonly="bookingForm.mode === 'self'" type="text" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50"></div>
               <div><label class="font-bold block mb-2">參加者手機</label><input v-model.trim="bookingForm.phone" :readonly="bookingForm.mode === 'self'" type="tel" inputmode="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50"></div>
-              <div v-if="bookingError" class="rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 data-text">{{ bookingError }}</div>
               <button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : '送出報名' }}</button>
             </div>
           </div>
@@ -768,17 +804,39 @@
         <Transition name="sheet" appear>
           <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float max-h-[90vh] overflow-y-auto app-scroll">
             <div class="flex items-center justify-between"><div><div class="text-[14px] font-bold text-brand-600">PROFILE</div><h2 class="text-[24px] font-bold mt-1">我的資料</h2></div><button @click="showProfile = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+            <div v-if="profileError" class="mt-4 rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 data-text">{{ profileError }}</div>
             <div class="mt-5 flex flex-col gap-4">
               <div><label class="font-bold block mb-2">暱稱</label><input v-model.trim="profileForm.nickname" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
-              <div><label class="font-bold block mb-2">登入手機</label><input v-model.trim="profileForm.phone" type="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"><div class="text-[13px] text-muted mt-2">變更後，下次請使用新手機號碼登入。</div></div>
-              <div class="rounded-2xl border border-line p-4">
-                <label class="flex items-center justify-between gap-4 cursor-pointer">
-                  <div><div class="font-bold">我有 DUPR 帳號</div><div class="text-[13px] text-muted mt-1">只記錄是否有帳號與 ID，不儲存分數排名。</div></div>
-                  <input v-model="profileForm.hasDupr" type="checkbox" class="w-5 h-5 accent-orange-500">
-                </label>
-                <div v-if="profileForm.hasDupr" class="mt-4"><label class="font-bold block mb-2">DUPR ID</label><input v-model.trim="profileForm.duprId" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="選填"></div>
+              <div class="rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3">
+                <div class="text-[12px] font-semibold text-gray-400">帳號與登入</div>
+                <div class="mt-2 flex items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-[12px] text-gray-400">登入手機</div>
+                    <div class="text-[15px] font-semibold text-gray-700 mt-0.5">{{ profile?.phone }}</div>
+                  </div>
+                  <div class="flex items-center gap-3 shrink-0">
+                    <button @click="toggleOwnPhoneEdit" class="min-h-0 text-[12px] text-gray-400 hover:text-gray-600 underline underline-offset-2">{{ ownPhoneEdit ? '收合' : '更換手機' }}</button>
+                    <button @click="toggleOwnPasswordEdit" class="min-h-0 text-[12px] text-gray-400 hover:text-gray-600 underline underline-offset-2">{{ ownPasswordEdit ? '收合' : '修改密碼' }}</button>
+                  </div>
+                </div>
+                <div v-if="ownPhoneEdit" class="mt-3 pt-3 border-t border-gray-200 flex flex-col gap-2.5">
+                  <input v-model.trim="ownPhoneForm.phone" type="tel" inputmode="tel" autocomplete="tel" class="w-full h-11 rounded-xl border border-gray-200 bg-white px-3 outline-none focus:border-gray-400" placeholder="新的登入手機">
+                  <input v-model="ownPhoneForm.currentPassword" type="password" autocomplete="current-password" class="w-full h-11 rounded-xl border border-gray-200 bg-white px-3 outline-none focus:border-gray-400" placeholder="目前密碼" @keyup.enter="changeOwnPhone">
+                  <div v-if="ownPhoneError" class="rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 text-[13px]">{{ ownPhoneError }}</div>
+                  <button @click="changeOwnPhone" :disabled="ownPhoneLoading" class="w-full rounded-xl bg-gray-700 text-white text-[14px] font-semibold py-2.5 disabled:opacity-50">{{ ownPhoneLoading ? '更新中…' : '確認更換手機' }}</button>
+                </div>
+                <div v-if="ownPasswordEdit" class="mt-3 pt-3 border-t border-gray-200 flex flex-col gap-2.5">
+                  <input v-model="ownPasswordForm.current" type="password" autocomplete="current-password" class="w-full h-11 rounded-xl border border-gray-200 bg-white px-3 outline-none focus:border-gray-400" placeholder="目前密碼">
+                  <input v-model="ownPasswordForm.password" type="password" autocomplete="new-password" class="w-full h-11 rounded-xl border border-gray-200 bg-white px-3 outline-none focus:border-gray-400" placeholder="新密碼（至少 8 碼）">
+                  <input v-model="ownPasswordForm.confirm" type="password" autocomplete="new-password" class="w-full h-11 rounded-xl border border-gray-200 bg-white px-3 outline-none focus:border-gray-400" placeholder="再次輸入新密碼" @keyup.enter="changeOwnPassword">
+                  <div v-if="ownPasswordError" class="rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 text-[13px]">{{ ownPasswordError }}</div>
+                  <button @click="changeOwnPassword" :disabled="ownPasswordLoading" class="w-full rounded-xl bg-gray-700 text-white text-[14px] font-semibold py-2.5 disabled:opacity-50">{{ ownPasswordLoading ? '更新中…' : '更新密碼' }}</button>
+                </div>
               </div>
-              <div v-if="profileError" class="rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 data-text">{{ profileError }}</div>
+              <div>
+                <label class="font-bold block mb-2">DUPR 分數</label>
+                <input v-model="profileForm.duprRating" type="number" inputmode="decimal" step="0.001" min="2" max="8" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="如果您有DUPR分數請填入此欄位">
+              </div>
               <button @click="saveProfile" :disabled="profileLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ profileLoading ? '儲存中…' : '儲存資料' }}</button>
               <button @click="logout" class="w-full rounded-xl border border-red-200 text-red-600 bg-white font-bold py-3">登出</button>
             </div>
@@ -793,7 +851,6 @@
         <Transition name="sheet" appear>
           <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float">
             <div class="flex justify-between items-center"><h2 class="text-[23px] font-bold">{{ substituteContext === 'admin' ? '管理員更換參加者' : '更換參加者' }}</h2><button @click="showSubstitute = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
-            <p class="text-muted leading-7">{{ substituteContext === 'admin' ? '更換實際參加者。若此名額已收款，原本的收款紀錄會保留作為帳務軌跡。' : '填入實際接手名額的球友。已確認收款後，球友端不能自行更換。' }}</p>
             <div class="flex flex-col gap-4">
               <div><label class="font-bold block mb-2">新參加者暱稱</label><input v-model.trim="substituteForm.nickname" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               <div><label class="font-bold block mb-2">新參加者手機</label><input v-model.trim="substituteForm.phone" type="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
@@ -901,6 +958,8 @@
               <button @click="showAccountSettings = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
             </div>
 
+            <div v-if="accountManageError" class="mt-4 rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 text-[14px]">{{ accountManageError }}</div>
+
             <div class="mt-5 rounded-2xl border border-line p-4">
               <div class="font-bold text-[18px]">手機號碼</div>
               <div class="text-[13px] text-muted mt-1">手機是主要識別；若新手機已有未註冊歷史，帳號會改連到該手機的既有紀錄。</div>
@@ -928,7 +987,15 @@
               重設登入密碼
             </button>
 
-            <div v-if="accountManageError" class="mt-4 rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 text-[14px]">{{ accountManageError }}</div>
+            <div class="mt-4 rounded-2xl border border-red-100 bg-red-50/40 p-4">
+              <div class="font-bold text-[17px] text-red-700">刪除錯誤球友資料</div>
+              <div v-if="deleteEligibility.loading" class="text-[13px] text-muted mt-1">檢查是否可刪除…</div>
+              <div v-else-if="deleteEligibility.canDelete" class="text-[13px] text-red-700/80 mt-1 leading-5">僅適用於輸入錯誤且沒有正式財務／結算歷史的球友。刪除後無法復原。</div>
+              <div v-else class="text-[13px] text-muted mt-1 leading-5">{{ deleteEligibility.reason || '此球友目前不可刪除。' }}</div>
+              <button v-if="deleteEligibility.canDelete" @click="deleteAdminPlayer" :disabled="accountManageLoading" class="mt-3 w-full rounded-xl border border-red-200 bg-white text-red-600 font-bold py-3 disabled:opacity-50">永久刪除球友資料</button>
+            </div>
+
+
           </div>
         </Transition>
       </div>
@@ -948,9 +1015,6 @@
               <button @click="showPasswordReset = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
             </div>
 
-            <div class="mt-5 rounded-2xl bg-amber-50 border border-amber-100 px-4 py-3 text-[14px] text-amber-800 leading-6">
-              設定完成後，球友下次登入請直接使用這組新密碼。
-            </div>
 
             <div class="mt-4 flex flex-col gap-4">
               <div>
@@ -1050,13 +1114,50 @@
           <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float max-h-[92vh] overflow-y-auto app-scroll">
             <div class="flex justify-between items-center"><div><div class="text-[14px] font-bold text-brand-600">{{ sessionForm.id ? 'EDIT SESSION' : 'NEW SESSION' }}</div><h2 class="text-[23px] font-bold mt-1">{{ sessionForm.id ? '編輯場次' : '建立新場次' }}</h2></div><button @click="showCreateSession = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
             <div class="mt-5 flex flex-col gap-4">
-              <div><label class="font-bold block mb-2">開始時間</label><input v-model="sessionForm.start" type="datetime-local" class="w-full h-12 rounded-xl border border-line px-3"></div>
-              <div><label class="font-bold block mb-2">結束時間</label><input v-model="sessionForm.end" type="datetime-local" class="w-full h-12 rounded-xl border border-line px-3"></div>
+              <div>
+                <label class="font-bold block mb-2">開始時間</label>
+                <div class="grid grid-cols-[1fr_112px] gap-2">
+                  <input :value="sessionDatePart(sessionForm.start)" @input="setSessionDateTimePart('start','date',$event.target.value)" type="date" class="w-full h-12 rounded-xl border border-line px-3 bg-white">
+                  <select :value="sessionTimePart(sessionForm.start)" @change="setSessionDateTimePart('start','time',$event.target.value)" class="w-full h-12 rounded-xl border border-line px-3 bg-white">
+                    <option value="">時間</option><option v-if="sessionTimePart(sessionForm.start) && !timeOptions.includes(sessionTimePart(sessionForm.start))" :value="sessionTimePart(sessionForm.start)">{{ sessionTimePart(sessionForm.start) }}</option><option v-for="time in timeOptions" :key="'start-'+time" :value="time">{{ time }}</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label class="font-bold block mb-2">結束時間</label>
+                <div class="grid grid-cols-[1fr_112px] gap-2">
+                  <input :value="sessionDatePart(sessionForm.end)" @input="setSessionDateTimePart('end','date',$event.target.value)" type="date" class="w-full h-12 rounded-xl border border-line px-3 bg-white">
+                  <select :value="sessionTimePart(sessionForm.end)" @change="setSessionDateTimePart('end','time',$event.target.value)" class="w-full h-12 rounded-xl border border-line px-3 bg-white">
+                    <option value="">時間</option><option v-if="sessionTimePart(sessionForm.end) && !timeOptions.includes(sessionTimePart(sessionForm.end))" :value="sessionTimePart(sessionForm.end)">{{ sessionTimePart(sessionForm.end) }}</option><option v-for="time in timeOptions" :key="'end-'+time" :value="time">{{ time }}</option>
+                  </select>
+                </div>
+              </div>
               <div><label class="font-bold block mb-2">場地</label><input v-model.trim="sessionForm.venue" class="w-full h-12 rounded-xl border border-line px-4" placeholder="例如：Pickle Fever 泰山館"></div>
+              <div>
+                <label class="font-bold block mb-2">場地照片</label>
+                <div class="rounded-2xl border border-line overflow-hidden bg-gray-50">
+                  <div class="aspect-[16/9] overflow-hidden bg-gray-100"><img :src="sessionPhotoPreview || sessionImageUrl({ photo_path: sessionForm.photoPath })" class="w-full h-full object-cover" alt="場地照片預覽"></div>
+                  <div class="p-3 flex gap-2">
+                    <label class="flex-1 h-11 rounded-xl bg-white border border-line font-bold text-[14px] flex items-center justify-center cursor-pointer">
+                      選擇照片
+                      <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" @change="handleSessionPhotoChange">
+                    </label>
+                    <button v-if="sessionForm.photoPath || sessionPhotoFile" type="button" @click="clearSessionPhoto" class="h-11 min-h-0 px-4 rounded-xl border border-line bg-white text-gray-600 font-bold text-[14px]">移除</button>
+                  </div>
+                </div>
+              </div>
               <div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">類型</label><input v-model.trim="sessionForm.category" class="w-full h-12 rounded-xl border border-line px-4" placeholder="一般場"></div><div><label class="font-bold block mb-2">人數上限</label><input v-model.number="sessionForm.capacity" type="number" min="1" class="w-full h-12 rounded-xl border border-line px-4"></div></div>
               <div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">單次費用</label><input v-model.number="sessionForm.price" :disabled="sessionForm.lockPricing" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 disabled:bg-gray-100 disabled:text-gray-500"></div><div><label class="font-bold block mb-2">套票扣次</label><input v-model.number="sessionForm.units" :disabled="sessionForm.lockPricing" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 disabled:bg-gray-100 disabled:text-gray-500"></div></div>
               <div v-if="sessionForm.lockPricing" class="text-[13px] text-muted -mt-2">已有報名紀錄，價格與套票扣次不可直接修改。</div>
-              <div><label class="font-bold block mb-2">報名截止</label><input v-model="sessionForm.registrationDeadline" type="datetime-local" class="w-full h-12 rounded-xl border border-line px-3"></div>
+              <div>
+                <label class="font-bold block mb-2">報名截止</label>
+                <div class="grid grid-cols-[1fr_112px] gap-2">
+                  <input :value="sessionDatePart(sessionForm.registrationDeadline)" @input="setSessionDateTimePart('registrationDeadline','date',$event.target.value)" type="date" class="w-full h-12 rounded-xl border border-line px-3 bg-white">
+                  <select :value="sessionTimePart(sessionForm.registrationDeadline)" @change="setSessionDateTimePart('registrationDeadline','time',$event.target.value)" class="w-full h-12 rounded-xl border border-line px-3 bg-white">
+                    <option value="">時間</option><option v-if="sessionTimePart(sessionForm.registrationDeadline) && !timeOptions.includes(sessionTimePart(sessionForm.registrationDeadline))" :value="sessionTimePart(sessionForm.registrationDeadline)">{{ sessionTimePart(sessionForm.registrationDeadline) }}</option><option v-for="time in timeOptions" :key="'deadline-'+time" :value="time">{{ time }}</option>
+                  </select>
+                </div>
+              </div>
               <div><label class="font-bold block mb-2">公開備註</label><textarea v-model.trim="sessionForm.publicNote" rows="3" class="w-full rounded-xl border border-line p-4 resize-none" placeholder="球友可見"></textarea></div>
               <div><label class="font-bold block mb-2">內部備註</label><textarea v-model.trim="sessionForm.internalNote" rows="3" class="w-full rounded-xl border border-line p-4 resize-none" placeholder="僅管理員可見"></textarea></div>
               <button @click="saveSession" :disabled="adminActionLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ adminActionLoading ? '儲存中…' : (sessionForm.id ? '儲存場次' : '建立並開放報名') }}</button>
@@ -1068,7 +1169,7 @@
 
     <!-- TOAST -->
     <Transition name="fade">
-      <div v-if="toast" class="absolute left-4 right-4 bottom-24 z-[80] flex justify-center pointer-events-none">
+      <div v-if="toast" class="absolute left-4 right-4 top-[92px] z-[80] flex justify-center pointer-events-none">
         <div class="max-w-sm bg-ink text-white rounded-2xl px-4 py-3 shadow-float flex items-start gap-3">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" class="text-orange-300 shrink-0 mt-0.5"><path d="M20 6L9 17l-5-5"/></svg>
           <span class="font-semibold leading-6">{{ toast }}</span>
@@ -1101,6 +1202,8 @@
       let toastTimer = null;
 
       const publicSessions = ref([]);
+      const publicSessionsOffset = ref(0);
+      const publicSessionsHasMore = ref(false);
       const sessionsLoading = ref(false);
       const selectedSession = ref(null);
       const publicRoster = ref([]);
@@ -1131,7 +1234,15 @@
       const showProfile = ref(false);
       const profileLoading = ref(false);
       const profileError = ref('');
-      const profileForm = ref({ nickname: '', phone: '', hasDupr: false, duprId: '' });
+      const profileForm = ref({ nickname: '', duprRating: '' });
+      const ownPhoneEdit = ref(false);
+      const ownPhoneLoading = ref(false);
+      const ownPhoneError = ref('');
+      const ownPhoneForm = ref({ phone: '', currentPassword: '' });
+      const ownPasswordEdit = ref(false);
+      const ownPasswordLoading = ref(false);
+      const ownPasswordError = ref('');
+      const ownPasswordForm = ref({ current: '', password: '', confirm: '' });
 
       const showSubstitute = ref(false);
       const substituteLoading = ref(false);
@@ -1141,6 +1252,8 @@
 
       const adminMode = ref('sessions');
       const adminSessions = ref([]);
+      const adminSessionsOffset = ref(0);
+      const adminSessionsHasMore = ref(false);
       const adminSelectedSession = ref(null);
       const adminRoster = ref([]);
       const adminRosterLoading = ref(false);
@@ -1161,6 +1274,7 @@
       const accountManageLoading = ref(false);
       const accountManageError = ref('');
       const accountSettingsForm = ref({ phone: '', disableReason: '' });
+      const deleteEligibility = ref({ loading: false, canDelete: false, reason: '' });
       const showPasswordReset = ref(false);
       const passwordResetLoading = ref(false);
       const passwordResetError = ref('');
@@ -1184,21 +1298,19 @@
       const financeEditForm = ref({ amount: 0, packageDelta: 0, note: '' });
 
       const showCreateSession = ref(false);
+      const sessionPhotoFile = ref(null);
+      const sessionPhotoPreview = ref('');
+      const settledNoteEditing = ref(false);
+      const settledNoteSaving = ref(false);
+      const settledNoteDraft = ref('');
       const sessionForm = ref({
-        id: null, start: '', end: '', venue: '', category: '一般場', capacity: 10,
+        id: null, start: '', end: '', venue: '', category: '一般場', capacity: 8,
         price: 500, units: 1, registrationDeadline: '',
-        publicNote: '', internalNote: '', lockPricing: false
+        publicNote: '', internalNote: '', photoPath: '', originalPhotoPath: '', lockPricing: false
       });
 
       const filteredPublicSessions = computed(() => {
-        return [...publicSessions.value].sort((a, b) => {
-          const aOpen = a.status === 'open' ? 0 : 1;
-          const bOpen = b.status === 'open' ? 0 : 1;
-          if (aOpen !== bOpen) return aOpen - bOpen;
-          const aTime = new Date(a.start_at).getTime();
-          const bTime = new Date(b.start_at).getTime();
-          return a.status === 'open' ? aTime - bTime : bTime - aTime;
-        });
+        return [...publicSessions.value].sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
       });
 
       const canBookSelectedSession = computed(() => {
@@ -1208,10 +1320,66 @@
         return true;
       });
 
+      function friendlyError(error) {
+        const msg = typeof error === 'string' ? error : (error?.message || String(error || '操作失敗'));
+        const rules = [
+          [/Admin permission required|Active admin operator required/i, '需要管理員權限'],
+          [/This phone number is already in use|phone.*already.*use|duplicate key.*phone/i, '這支手機號碼已被使用'],
+          [/Admin accounts cannot be deleted|Admin accounts cannot be disabled|Admin cannot delete|cannot disable.*admin/i, '管理員帳號不能執行此操作'],
+          [/last active admin/i, '至少需要保留一位啟用中的管理員'],
+          [/Player not found|Linked player profile not found/i, '找不到球友資料'],
+          [/Session not found/i, '找不到場次'],
+          [/Settled or cancelled sessions cannot be edited/i, '已結算或已取消的場次不能編輯'],
+          [/Session end time must be after start time/i, '結束時間必須晚於開始時間'],
+          [/Venue is required/i, '請填寫場地'],
+          [/Capacity must be greater than zero/i, '人數上限必須大於 0'],
+          [/Capacity cannot be lower than the current active booking count/i, '人數上限不能少於目前已報名人數'],
+          [/Default price cannot be negative/i, '單次費用不能小於 0'],
+          [/Default package units cannot be negative/i, '套票扣次不能小於 0'],
+          [/Price and package units cannot be changed after bookings exist/i, '已有報名後不能修改費用或套票扣次'],
+          [/Invalid Taiwan mobile phone number/i, '請輸入正確的台灣手機號碼'],
+          [/current password.*incorrect|Invalid login credentials/i, '目前密碼不正確'],
+          [/registered account required/i, '此球友尚未建立登入帳號'],
+          [/failed to fetch|networkerror|network request failed/i, '連線失敗，請稍後再試'],
+          [/Edge Function.*non-2xx/i, '操作失敗，請稍後再試']
+        ];
+        for (const [pattern, text] of rules) if (pattern.test(msg)) return text;
+        return /[A-Za-z]{4,}/.test(msg) ? '操作失敗，請確認資料後再試一次' : msg;
+      }
+
       function showToast(message) {
-        toast.value = message;
+        toast.value = friendlyError(message);
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => toast.value = '', 3200);
+      }
+
+      async function getEdgeFunctionErrorMessage(error) {
+        const fallback = error?.message || String(error || 'Edge Function 呼叫失敗');
+        try {
+          const response = error?.context;
+          if (!response) return fallback;
+
+          const readable = typeof response.clone === 'function' ? response.clone() : response;
+          const contentType = readable?.headers?.get?.('content-type') || '';
+
+          if (contentType.includes('application/json') && typeof readable.json === 'function') {
+            const payload = await readable.json();
+            return payload?.error || payload?.message || payload?.msg || fallback;
+          }
+
+          if (typeof readable.text === 'function') {
+            const text = (await readable.text())?.trim();
+            if (text) {
+              try {
+                const payload = JSON.parse(text);
+                return payload?.error || payload?.message || payload?.msg || text;
+              } catch (_) {
+                return text;
+              }
+            }
+          }
+        } catch (_) {}
+        return fallback;
       }
 
       function normalizePhone(input) {
@@ -1235,6 +1403,11 @@
         return Number(value || 0).toLocaleString('zh-TW');
       }
 
+      function formatDupr(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 3, useGrouping: false }) : '';
+      }
+
       function signedUnits(value) {
         const n = Number(value || 0);
         if (n > 0) return `+${n}`;
@@ -1253,6 +1426,39 @@
       function formatTimeRange(start, end) { return start && end ? `${timeFmt.format(new Date(start))}–${timeFmt.format(new Date(end))}` : '—'; }
       function formatDateTime(value) { return value ? dateTimeFmt.format(new Date(value)) : '—'; }
       function formatDeadline(value) { return value ? `${formatDateShort(value)} ${timeFmt.format(new Date(value))}` : '未設定'; }
+
+      const timeOptions = Array.from({ length: 24 * 12 }, (_, i) => {
+        const h = String(Math.floor(i / 12)).padStart(2, '0');
+        const m = String((i % 12) * 5).padStart(2, '0');
+        return `${h}:${m}`;
+      });
+
+      function sessionDatePart(value) { return value ? String(value).slice(0, 10) : ''; }
+      function sessionTimePart(value) { return value ? String(value).slice(11, 16) : ''; }
+      function localDateString(date = new Date()) {
+        const pad = n => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+      }
+      function setSessionDateTimePart(field, part, value) {
+        const current = String(sessionForm.value[field] || '');
+        let date = sessionDatePart(current);
+        let time = sessionTimePart(current);
+        if (part === 'date') {
+          date = value;
+          if (value && !time) time = '09:00';
+        } else {
+          time = value;
+          if (value && !date) date = localDateString();
+        }
+        sessionForm.value[field] = date && time ? `${date}T${time}` : '';
+        if (field === 'start' && sessionForm.value.start) applySessionTimeDefaults();
+      }
+
+      function sessionImageUrl(session) {
+        const path = session?.photo_path || session?.photoPath;
+        if (!path) return SESSION_PLACEHOLDER_IMAGE;
+        return sb.storage.from('session-images').getPublicUrl(path).data.publicUrl || SESSION_PLACEHOLDER_IMAGE;
+      }
 
       function sessionProgress(session) {
         if (!session?.capacity) return 0;
@@ -1279,18 +1485,26 @@
         return ({ draft: '草稿', open: '開放報名', settled: '已結算', cancelled: '已取消' })[status] || status || '—';
       }
 
-      async function loadPublicSessions() {
+      async function loadPublicSessions(reset = true) {
         sessionsLoading.value = true;
-        const { data, error } = await sb.rpc('list_public_sessions', { p_limit: 30, p_offset: 0, p_status: null });
+        if (reset) publicSessionsOffset.value = 0;
+        const { data, error } = await sb.rpc('list_public_sessions', { p_limit: 30, p_offset: publicSessionsOffset.value, p_status: null });
         sessionsLoading.value = false;
-        if (error) { showToast(`場次載入失敗：${error.message}`); return; }
-        publicSessions.value = data || [];
+        if (error) { showToast(`場次載入失敗：${friendlyError(error)}`); return; }
+        if (reset) publicSessions.value = data || [];
+        else publicSessions.value.push(...(data || []));
+        publicSessionsHasMore.value = (data || []).length === 30;
+      }
+
+      async function loadMorePublicSessions() {
+        publicSessionsOffset.value += 30;
+        await loadPublicSessions(false);
       }
 
       async function loadProfile() {
         if (!user.value) { profile.value = null; return; }
         const { data, error } = await sb.from('players')
-          .select('id,auth_user_id,phone,nickname,has_dupr,dupr_id,role')
+          .select('id,auth_user_id,phone,nickname,dupr_rating,role')
           .eq('auth_user_id', user.value.id)
           .single();
         if (error) {
@@ -1335,7 +1549,7 @@
       async function loadMoreBookings() {
         myBookingsOffset.value += 30;
         const { data, error } = await sb.rpc('get_my_bookings', { p_limit: 30, p_offset: myBookingsOffset.value });
-        if (error) { showToast(error.message); return; }
+        if (error) { showToast(friendlyError(error)); return; }
         myBookings.value.push(...(data || []));
         myBookingsHasMore.value = (data || []).length === 30;
       }
@@ -1343,16 +1557,24 @@
       async function loadMoreFinance() {
         myFinanceOffset.value += 30;
         const { data, error } = await sb.rpc('get_my_financial_history', { p_limit: 30, p_offset: myFinanceOffset.value });
-        if (error) { showToast(error.message); return; }
+        if (error) { showToast(friendlyError(error)); return; }
         myFinance.value.push(...(data || []));
         myFinanceHasMore.value = (data || []).length === 30;
       }
 
-      async function loadAdminSessions() {
+      async function loadAdminSessions(reset = true) {
         if (profile.value?.role !== 'admin') return;
-        const { data, error } = await sb.rpc('list_admin_sessions', { p_limit: 30, p_offset: 0, p_status: null });
-        if (error) { showToast(`管理場次載入失敗：${error.message}`); return; }
-        adminSessions.value = data || [];
+        if (reset) adminSessionsOffset.value = 0;
+        const { data, error } = await sb.rpc('list_admin_sessions', { p_limit: 30, p_offset: adminSessionsOffset.value, p_status: null });
+        if (error) { showToast(`管理場次載入失敗：${friendlyError(error)}`); return; }
+        if (reset) adminSessions.value = data || [];
+        else adminSessions.value.push(...(data || []));
+        adminSessionsHasMore.value = (data || []).length === 30;
+      }
+
+      async function loadMoreAdminSessions() {
+        adminSessionsOffset.value += 30;
+        await loadAdminSessions(false);
       }
 
       async function openAdminPlayers() {
@@ -1370,7 +1592,7 @@
           p_offset: adminPlayersOffset.value
         });
         adminPlayersLoading.value = false;
-        if (error) { showToast(`球友查詢失敗：${error.message}`); return; }
+        if (error) { showToast(`球友查詢失敗：${friendlyError(error)}`); return; }
         if (reset) adminPlayers.value = data || [];
         else adminPlayers.value.push(...(data || []));
         adminPlayersHasMore.value = (data || []).length === 30;
@@ -1384,7 +1606,7 @@
       async function loadPackagePlans() {
         if (profile.value?.role !== 'admin') return;
         const { data, error } = await sb.rpc('list_admin_package_plans');
-        if (error) { showToast(`套票方案載入失敗：${error.message}`); return; }
+        if (error) { showToast(`套票方案載入失敗：${friendlyError(error)}`); return; }
         packagePlans.value = data || [];
       }
 
@@ -1395,7 +1617,7 @@
           p_player_id: playerId, p_limit: 30, p_offset: adminPlayerHistoryOffset.value
         });
         adminPlayerHistoryLoading.value = false;
-        if (error) { showToast(`球友財務載入失敗：${error.message}`); return; }
+        if (error) { showToast(`球友財務載入失敗：${friendlyError(error)}`); return; }
         if (reset) adminPlayerHistory.value = data || [];
         else adminPlayerHistory.value.push(...(data || []));
         adminPlayerHistoryHasMore.value = (data || []).length === 30;
@@ -1428,7 +1650,22 @@
         await Promise.all([loadAdminPlayerHistory(adminPlayerTarget.value.player_id, true), loadAdminPlayers(true)]);
       }
 
-      function openAdminAccountSettings() {
+      async function loadDeleteEligibility(playerId) {
+        deleteEligibility.value = { loading: true, canDelete: false, reason: '' };
+        const { data, error } = await sb.rpc('get_admin_player_delete_eligibility', { p_player_id: playerId });
+        if (error) {
+          deleteEligibility.value = { loading: false, canDelete: false, reason: friendlyError(error) };
+          return;
+        }
+        const row = data?.[0] || {};
+        deleteEligibility.value = {
+          loading: false,
+          canDelete: !!row.can_delete,
+          reason: row.reason || ''
+        };
+      }
+
+      async function openAdminAccountSettings() {
         if (!adminPlayerTarget.value) return;
         accountManageError.value = '';
         accountSettingsForm.value = {
@@ -1436,6 +1673,7 @@
           disableReason: adminPlayerTarget.value.disabled_reason || ''
         };
         showAccountSettings.value = true;
+        await loadDeleteEligibility(adminPlayerTarget.value.player_id);
       }
 
       async function refreshAdminPlayerByPhone(phone, preferredPlayerId = null) {
@@ -1464,7 +1702,7 @@
         try {
           newPhone = normalizePhone(accountSettingsForm.value.phone);
         } catch (e) {
-          accountManageError.value = e?.message || String(e);
+          accountManageError.value = friendlyError(e);
           return;
         }
         if (newPhone === adminPlayerTarget.value.phone) {
@@ -1484,13 +1722,13 @@
               phone: newPhone
             }
           });
-          if (error) throw error;
+          if (error) throw new Error(await getEdgeFunctionErrorMessage(error));
           if (data?.error) throw new Error(data.error);
           await refreshAdminPlayerByPhone(newPhone, data?.player_id || null);
           showAccountSettings.value = false;
           showToast(data?.moved ? '手機已修正，帳號已連到該手機的既有歷史' : '手機號碼已更新');
         } catch (e) {
-          accountManageError.value = e?.message || String(e);
+          accountManageError.value = friendlyError(e);
         } finally {
           accountManageLoading.value = false;
         }
@@ -1518,13 +1756,40 @@
               reason: disabling ? (accountSettingsForm.value.disableReason || null) : null
             }
           });
-          if (error) throw error;
+          if (error) throw new Error(await getEdgeFunctionErrorMessage(error));
           if (data?.error) throw new Error(data.error);
           await refreshAdminPlayerByPhone(currentPhone, adminPlayerTarget.value.player_id);
           accountSettingsForm.value.disableReason = '';
           showToast(disabling ? '帳號已停用，歷史紀錄完整保留' : '帳號已重新啟用');
         } catch (e) {
-          accountManageError.value = e?.message || String(e);
+          accountManageError.value = friendlyError(e);
+        } finally {
+          accountManageLoading.value = false;
+        }
+      }
+
+      async function deleteAdminPlayer() {
+        if (!adminPlayerTarget.value || !deleteEligibility.value.canDelete) return;
+        accountManageError.value = '';
+        const target = { ...adminPlayerTarget.value };
+        if (!confirm(`永久刪除「${target.nickname}」(${target.phone})？\n\n僅適用於沒有確認財務、且目前不是正式參加者的錯誤資料。此動作無法復原。`)) return;
+        if (!confirm('再次確認：確定永久刪除此球友資料？')) return;
+
+        accountManageLoading.value = true;
+        try {
+          const { data, error } = await sb.functions.invoke('admin-manage-player-account', {
+            body: { action: 'delete_player', player_id: target.player_id }
+          });
+          if (error) throw new Error(await getEdgeFunctionErrorMessage(error));
+          if (data?.error) throw new Error(data.error);
+          showAccountSettings.value = false;
+          showAdminPlayer.value = false;
+          adminPlayerTarget.value = null;
+          await loadAdminPlayers(true);
+          showToast('錯誤球友資料已永久刪除');
+        } catch (e) {
+          accountManageError.value = friendlyError(e);
+          await loadDeleteEligibility(target.player_id);
         } finally {
           accountManageLoading.value = false;
         }
@@ -1573,13 +1838,13 @@
               new_password: password
             }
           });
-          if (error) throw error;
+          if (error) throw new Error(await getEdgeFunctionErrorMessage(error));
           if (data?.error) throw new Error(data.error);
           showPasswordReset.value = false;
           passwordResetForm.value = { password: '', confirm: '' };
           showToast('登入密碼已重設');
         } catch (e) {
-          passwordResetError.value = e?.message || String(e);
+          passwordResetError.value = friendlyError(e);
         } finally {
           passwordResetLoading.value = false;
         }
@@ -1604,7 +1869,7 @@
           if (error) throw error;
           await refreshAdminPlayer();
           showToast('套票已新增');
-        } catch (e) { showToast(e?.message || String(e)); }
+        } catch (e) { showToast(friendlyError(e)); }
         finally { adminActionLoading.value = false; }
       }
 
@@ -1630,7 +1895,7 @@
           adminAdjustmentForm.value = { amount: 0, packageDelta: 0, note: '' };
           await refreshAdminPlayer();
           showToast('調整紀錄已新增');
-        } catch (e) { showToast(e?.message || String(e)); }
+        } catch (e) { showToast(friendlyError(e)); }
         finally { adminActionLoading.value = false; }
       }
 
@@ -1670,7 +1935,7 @@
           const wasEdit = !!form.id;
           resetPackagePlanForm();
           showToast(wasEdit ? '套票方案已更新' : '套票方案已新增');
-        } catch (e) { showToast(e?.message || String(e)); }
+        } catch (e) { showToast(friendlyError(e)); }
         finally { adminActionLoading.value = false; }
       }
 
@@ -1701,7 +1966,7 @@
           p_limit: 30,
           p_offset: adminFinanceOffset.value
         });
-        if (error) { showToast(`財務查詢失敗：${error.message}`); return; }
+        if (error) { showToast(`財務查詢失敗：${friendlyError(error)}`); return; }
         if (reset) adminFinance.value = data || [];
         else adminFinance.value.push(...(data || []));
         adminFinanceHasMore.value = (data || []).length === 30;
@@ -1719,10 +1984,10 @@
           p_to: dates.to,
           p_search: financeFilter.value.search || null
         });
-        if (error) { showToast(`匯出失敗：${error.message}`); return; }
+        if (error) { showToast(`匯出失敗：${friendlyError(error)}`); return; }
         const rows = data || [];
         const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-        const header = ['日期','球友','套票餘額','金額','套票次數','狀態','操作者','備註'];
+        const header = ['時間','球友','套票餘額','金額','套票次數','狀態','審核','備註'];
         const body = rows.map(r => [
           formatDateTime(r.date_at), r.player, r.package_balance ?? '', r.amount ?? 0,
           r.package_units ?? 0, r.status, r.operator ?? '', r.note ?? ''
@@ -1745,7 +2010,7 @@
         rosterLoading.value = true;
         const { data, error } = await sb.rpc('get_public_session_roster', { p_session_id: session.id });
         rosterLoading.value = false;
-        if (error) { showToast(`名單載入失敗：${error.message}`); return; }
+        if (error) { showToast(`名單載入失敗：${friendlyError(error)}`); return; }
         publicRoster.value = data || [];
       }
 
@@ -1907,7 +2172,7 @@
           }
           showToast(bookingForm.value.mode === 'self' ? '報名成功，等待主辦方確認收款' : '已成功幫朋友報名');
         } catch (e) {
-          bookingError.value = e?.message || String(e);
+          bookingError.value = friendlyError(e);
         } finally {
           bookingLoading.value = false;
         }
@@ -1916,7 +2181,7 @@
       async function cancelMyBooking(row) {
         if (!confirm(`確定取消 ${formatDateShort(row.start_at)} 的報名嗎？`)) return;
         const { error } = await sb.rpc('cancel_booking', { p_booking_id: row.booking_id });
-        if (error) { showToast(error.message); return; }
+        if (error) { showToast(friendlyError(error)); return; }
         await Promise.all([loadMyData(true), loadPublicSessions()]);
         showToast('已取消報名');
       }
@@ -1956,7 +2221,7 @@
             showToast('參加者已更新');
           }
         } catch (e) {
-          showToast(e?.message || String(e));
+          showToast(friendlyError(e));
         } finally {
           substituteLoading.value = false;
         }
@@ -1976,7 +2241,7 @@
           await Promise.all([refreshAdminDetail(), loadPublicSessions(), loadMyData(true)]);
           showToast(confirmed ? '報名已取消，原收款歷史已保留' : '報名已取消');
         } catch (e) {
-          showToast(e?.message || String(e));
+          showToast(friendlyError(e));
         } finally {
           adminActionLoading.value = false;
         }
@@ -1985,13 +2250,126 @@
       function openProfile() {
         if (!profile.value) return;
         profileError.value = '';
+        ownPhoneError.value = '';
+        ownPhoneEdit.value = false;
+        ownPhoneForm.value = { phone: profile.value.phone || '', currentPassword: '' };
+        ownPasswordEdit.value = false;
+        ownPasswordError.value = '';
+        ownPasswordForm.value = { current: '', password: '', confirm: '' };
         profileForm.value = {
           nickname: profile.value.nickname || '',
-          phone: profile.value.phone || '',
-          hasDupr: !!profile.value.has_dupr,
-          duprId: profile.value.dupr_id || ''
+          duprRating: profile.value.dupr_rating ?? ''
         };
         showProfile.value = true;
+      }
+
+      function toggleOwnPhoneEdit() {
+        ownPhoneError.value = '';
+        ownPhoneEdit.value = !ownPhoneEdit.value;
+        if (ownPhoneEdit.value) {
+          ownPasswordEdit.value = false;
+          ownPasswordError.value = '';
+          ownPasswordForm.value = { current: '', password: '', confirm: '' };
+        }
+        ownPhoneForm.value = { phone: profile.value?.phone || '', currentPassword: '' };
+      }
+
+      function toggleOwnPasswordEdit() {
+        ownPasswordError.value = '';
+        ownPasswordEdit.value = !ownPasswordEdit.value;
+        if (ownPasswordEdit.value) {
+          ownPhoneEdit.value = false;
+          ownPhoneError.value = '';
+          ownPhoneForm.value = { phone: profile.value?.phone || '', currentPassword: '' };
+        }
+        ownPasswordForm.value = { current: '', password: '', confirm: '' };
+      }
+
+      async function changeOwnPassword() {
+        ownPasswordError.value = '';
+        const currentPassword = ownPasswordForm.value.current;
+        const newPassword = ownPasswordForm.value.password;
+        const confirmPassword = ownPasswordForm.value.confirm;
+
+        if (!currentPassword) {
+          ownPasswordError.value = '請輸入目前密碼';
+          return;
+        }
+        if (!newPassword || newPassword.length < 8) {
+          ownPasswordError.value = '新密碼至少需要 8 碼';
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          ownPasswordError.value = '兩次輸入的新密碼不一致';
+          return;
+        }
+        if (currentPassword === newPassword) {
+          ownPasswordError.value = '新密碼請勿與目前密碼相同';
+          return;
+        }
+
+        ownPasswordLoading.value = true;
+        try {
+          const { data: userData, error: userError } = await sb.auth.getUser();
+          if (userError) throw userError;
+          const email = userData?.user?.email;
+          if (!email) throw new Error('找不到目前登入帳號');
+
+          const { error: verifyError } = await sb.auth.signInWithPassword({
+            email,
+            password: currentPassword
+          });
+          if (verifyError) throw new Error('目前密碼不正確');
+
+          const { error: updateError } = await sb.auth.updateUser({ password: newPassword, current_password: currentPassword });
+          if (updateError) throw updateError;
+
+          ownPasswordEdit.value = false;
+          ownPasswordForm.value = { current: '', password: '', confirm: '' };
+          showToast('登入密碼已更新');
+        } catch (e) {
+          ownPasswordError.value = readableAuthError(e);
+        } finally {
+          ownPasswordLoading.value = false;
+        }
+      }
+
+      async function changeOwnPhone() {
+        ownPhoneError.value = '';
+        let newPhone;
+        try {
+          newPhone = normalizePhone(ownPhoneForm.value.phone);
+        } catch (e) {
+          ownPhoneError.value = friendlyError(e);
+          return;
+        }
+        const currentPassword = ownPhoneForm.value.currentPassword;
+        if (!currentPassword) {
+          ownPhoneError.value = '請輸入目前密碼';
+          return;
+        }
+        if (newPhone === profile.value?.phone) {
+          ownPhoneError.value = '新的手機號碼與目前相同';
+          return;
+        }
+        if (!confirm(`確認把登入手機改成 ${newPhone}？\n\n更換成功後，下次請使用新手機登入。`)) return;
+
+        ownPhoneLoading.value = true;
+        try {
+          const { data, error } = await sb.functions.invoke('change-phone', {
+            body: { phone: newPhone, current_password: currentPassword }
+          });
+          if (error) throw new Error(await getEdgeFunctionErrorMessage(error));
+          if (data?.error) throw new Error(data.error);
+          await loadProfile();
+          ownPhoneEdit.value = false;
+          ownPhoneForm.value = { phone: profile.value?.phone || newPhone, currentPassword: '' };
+          showToast('登入手機已更新');
+        } catch (e) {
+          ownPhoneError.value = friendlyError(e);
+        } finally {
+          ownPhoneLoading.value = false;
+        }
       }
 
       async function saveProfile() {
@@ -1999,27 +2377,31 @@
         profileLoading.value = true;
         try {
           if (!profileForm.value.nickname) throw new Error('暱稱不能空白');
-          const newPhone = normalizePhone(profileForm.value.phone);
-          const phoneChanged = newPhone !== profile.value.phone;
+
+          let duprRating = null;
+          const rawDupr = String(profileForm.value.duprRating ?? '').trim();
+          if (rawDupr !== '') {
+            duprRating = Number(rawDupr);
+            if (!Number.isFinite(duprRating) || duprRating < 2 || duprRating > 8) {
+              throw new Error('DUPR 分數需介於 2.000 到 8.000');
+            }
+            if (!/^\d+(?:\.\d{1,3})?$/.test(rawDupr)) {
+              throw new Error('DUPR 分數最多輸入到小數點後三位');
+            }
+            duprRating = Math.round(duprRating * 1000) / 1000;
+          }
 
           const { error: profileUpdateError } = await sb.rpc('update_my_profile', {
             p_nickname: profileForm.value.nickname,
-            p_has_dupr: profileForm.value.hasDupr,
-            p_dupr_id: profileForm.value.hasDupr ? (profileForm.value.duprId || null) : null
+            p_dupr_rating: duprRating
           });
           if (profileUpdateError) throw profileUpdateError;
 
-          if (phoneChanged) {
-            const { data, error } = await sb.functions.invoke('change-phone', { body: { phone: newPhone } });
-            if (error) throw error;
-            if (data?.error) throw new Error(data.error);
-          }
-
           await loadProfile();
           showProfile.value = false;
-          showToast(phoneChanged ? '資料已更新；下次請用新手機登入' : '個人資料已更新');
+          showToast('個人資料已更新');
         } catch (e) {
-          profileError.value = e?.message || String(e);
+          profileError.value = friendlyError(e);
         } finally {
           profileLoading.value = false;
         }
@@ -2027,11 +2409,13 @@
 
       async function openAdminSession(session) {
         adminSelectedSession.value = session;
+        settledNoteEditing.value = false;
+        settledNoteDraft.value = session.internal_note || '';
         subView.value = 'adminSession';
         adminRosterLoading.value = true;
         const { data, error } = await sb.rpc('get_admin_session_roster', { p_session_id: session.session_id });
         adminRosterLoading.value = false;
-        if (error) { showToast(error.message); return; }
+        if (error) { showToast(friendlyError(error)); return; }
         adminRoster.value = data || [];
       }
 
@@ -2039,9 +2423,42 @@
         if (!adminSelectedSession.value) return;
         await loadAdminSessions();
         const updated = adminSessions.value.find(s => s.session_id === adminSelectedSession.value.session_id);
-        if (updated) adminSelectedSession.value = updated;
+        if (updated) {
+          adminSelectedSession.value = updated;
+          if (!settledNoteEditing.value) settledNoteDraft.value = updated.internal_note || '';
+        }
         const { data, error } = await sb.rpc('get_admin_session_roster', { p_session_id: adminSelectedSession.value.session_id });
         if (!error) adminRoster.value = data || [];
+      }
+
+      function startSettledNoteEdit() {
+        if (adminSelectedSession.value?.status !== 'settled') return;
+        settledNoteDraft.value = adminSelectedSession.value.internal_note || '';
+        settledNoteEditing.value = true;
+      }
+
+      function cancelSettledNoteEdit() {
+        settledNoteEditing.value = false;
+        settledNoteDraft.value = adminSelectedSession.value?.internal_note || '';
+      }
+
+      async function saveSettledInternalNote() {
+        if (!adminSelectedSession.value || adminSelectedSession.value.status !== 'settled') return;
+        settledNoteSaving.value = true;
+        try {
+          const { error } = await sb.rpc('update_settled_session_internal_note', {
+            p_session_id: adminSelectedSession.value.session_id,
+            p_internal_note: settledNoteDraft.value || null
+          });
+          if (error) throw error;
+          settledNoteEditing.value = false;
+          await refreshAdminDetail();
+          showToast('內部備註已更新');
+        } catch (e) {
+          showToast(friendlyError(e));
+        } finally {
+          settledNoteSaving.value = false;
+        }
       }
 
       async function confirmFinance(row) {
@@ -2051,7 +2468,7 @@
           if (error) throw error;
           await refreshAdminDetail();
           showToast('已確認收款');
-        } catch (e) { showToast(e?.message || String(e)); }
+        } catch (e) { showToast(friendlyError(e)); }
         finally { adminActionLoading.value = false; }
       }
 
@@ -2063,7 +2480,7 @@
           if (error) throw error;
           await refreshAdminDetail();
           showToast('已改回待確認');
-        } catch (e) { showToast(e?.message || String(e)); }
+        } catch (e) { showToast(friendlyError(e)); }
         finally { adminActionLoading.value = false; }
       }
 
@@ -2086,7 +2503,7 @@
           showFinanceEdit.value = false;
           await refreshAdminDetail();
           showToast('待確認內容已更新');
-        } catch (e) { showToast(e?.message || String(e)); }
+        } catch (e) { showToast(friendlyError(e)); }
         finally { adminActionLoading.value = false; }
       }
 
@@ -2110,7 +2527,7 @@
           await Promise.all([refreshAdminDetail(), loadPublicSessions()]);
           showToast('場次已取消');
         } catch (e) {
-          showToast(e?.message || String(e));
+          showToast(friendlyError(e));
         } finally {
           adminActionLoading.value = false;
         }
@@ -2121,7 +2538,7 @@
         adminActionLoading.value = true;
         const { error } = await sb.rpc('settle_session', { p_session_id: adminSelectedSession.value.session_id, p_settlement_note: '由管理端完成結算' });
         adminActionLoading.value = false;
-        if (error) { showToast(error.message); return; }
+        if (error) { showToast(friendlyError(error)); return; }
         await Promise.all([refreshAdminDetail(), loadPublicSessions()]);
         showToast('場次已完成結算');
       }
@@ -2140,47 +2557,115 @@
         return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}`;
       }
 
+      function formatLocalDateTimeInput(date) {
+        const pad = n => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+
+      function shiftLocalDateTimeInput(value, hours) {
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        date.setHours(date.getHours() + hours);
+        return formatLocalDateTimeInput(date);
+      }
+
+      function applySessionTimeDefaults() {
+        if (!sessionForm.value.start) return;
+        sessionForm.value.end = shiftLocalDateTimeInput(sessionForm.value.start, 3);
+        sessionForm.value.registrationDeadline = shiftLocalDateTimeInput(sessionForm.value.start, -1);
+      }
+
       function resetSessionForm() {
         sessionForm.value = {
-          id: null, start: '', end: '', venue: '', category: '一般場', capacity: 10,
+          id: null, start: '', end: '', venue: '', category: '一般場', capacity: 8,
           price: 500, units: 1, registrationDeadline: '',
-          publicNote: '', internalNote: '', lockPricing: false
+          publicNote: '', internalNote: '', photoPath: '', originalPhotoPath: '', lockPricing: false
         };
       }
 
       function openCreateSession() {
         resetSessionForm();
+        sessionPhotoFile.value = null;
+        if (sessionPhotoPreview.value) URL.revokeObjectURL(sessionPhotoPreview.value);
+        sessionPhotoPreview.value = '';
         showCreateSession.value = true;
       }
 
       function openEditSession(session) {
+        sessionPhotoFile.value = null;
+        if (sessionPhotoPreview.value) URL.revokeObjectURL(sessionPhotoPreview.value);
+        sessionPhotoPreview.value = '';
         sessionForm.value = {
           id: session.session_id,
           start: toTaipeiInput(session.start_at),
           end: toTaipeiInput(session.end_at),
           venue: session.venue || '',
           category: session.category || '一般場',
-          capacity: Number(session.capacity || 10),
+          capacity: Number(session.capacity || 8),
           price: Number(session.default_price || 0),
           units: Number(session.default_package_units || 0),
           registrationDeadline: toTaipeiInput(session.registration_deadline),
           publicNote: session.public_note || '',
           internalNote: session.internal_note || '',
+          photoPath: session.photo_path || '',
+          originalPhotoPath: session.photo_path || '',
           lockPricing: Number(session.registered_count || 0) > 0
         };
         showCreateSession.value = true;
+      }
+
+      function handleSessionPhotoChange(event) {
+        const file = event?.target?.files?.[0];
+        if (!file) return;
+        if (!['image/jpeg','image/png','image/webp'].includes(file.type)) {
+          showToast('場地照片請使用 JPG、PNG 或 WebP');
+          event.target.value = '';
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          showToast('場地照片請小於 5 MB');
+          event.target.value = '';
+          return;
+        }
+        if (sessionPhotoPreview.value) URL.revokeObjectURL(sessionPhotoPreview.value);
+        sessionPhotoFile.value = file;
+        sessionPhotoPreview.value = URL.createObjectURL(file);
+      }
+
+      function clearSessionPhoto() {
+        if (sessionPhotoPreview.value) URL.revokeObjectURL(sessionPhotoPreview.value);
+        sessionPhotoPreview.value = '';
+        sessionPhotoFile.value = null;
+        sessionForm.value.photoPath = '';
+      }
+
+      async function uploadSessionPhoto(sessionId) {
+        if (!sessionPhotoFile.value) return sessionForm.value.photoPath || null;
+        const file = sessionPhotoFile.value;
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+        const path = `${sessionId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+        const { error } = await sb.storage.from('session-images').upload(path, file, {
+          cacheControl: '3600', upsert: false, contentType: file.type
+        });
+        if (error) throw new Error('場地照片上傳失敗');
+        return path;
       }
 
       async function saveSession() {
         adminActionLoading.value = true;
         try {
           if (!sessionForm.value.start || !sessionForm.value.end || !sessionForm.value.venue) throw new Error('開始、結束時間與場地為必填');
+          const startAt = new Date(sessionForm.value.start);
+          const endAt = new Date(sessionForm.value.end);
+          if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt <= startAt) throw new Error('結束時間必須晚於開始時間');
+
           const values = {
-            start: new Date(sessionForm.value.start).toISOString(),
-            end: new Date(sessionForm.value.end).toISOString(),
+            start: startAt.toISOString(),
+            end: endAt.toISOString(),
             venue: sessionForm.value.venue,
             category: sessionForm.value.category || '一般場',
-            capacity: Number(sessionForm.value.capacity || 10),
+            capacity: Number(sessionForm.value.capacity || 8),
             price: Number(sessionForm.value.price || 0),
             units: Number(sessionForm.value.units || 0),
             registrationDeadline: toIsoOrNull(sessionForm.value.registrationDeadline),
@@ -2188,47 +2673,74 @@
             internalNote: sessionForm.value.internalNote || null
           };
 
-          if (sessionForm.value.id) {
-            const { error } = await sb.rpc('update_session_details', {
-              p_session_id: sessionForm.value.id,
-              p_start_at: values.start,
-              p_end_at: values.end,
-              p_venue: values.venue,
-              p_category: values.category,
-              p_capacity: values.capacity,
-              p_default_price: values.price,
-              p_default_package_units: values.units,
-              p_registration_deadline: values.registrationDeadline,
-              p_public_note: values.publicNote,
-              p_internal_note: values.internalNote
-            });
-            if (error) throw error;
-          } else {
-            const { error } = await sb.from('sessions').insert({
-              start_at: values.start,
-              end_at: values.end,
-              venue: values.venue,
-              category: values.category,
-              capacity: values.capacity,
-              default_price: values.price,
-              default_package_units: values.units,
-              registration_deadline: values.registrationDeadline,
-              cancel_deadline: null,
-              status: 'open',
-              public_note: values.publicNote,
-              internal_note: values.internalNote,
-              created_by: profile.value.id
-            });
-            if (error) throw error;
+          const editedId = sessionForm.value.id;
+          const sessionId = editedId || crypto.randomUUID();
+          const oldPhotoPath = sessionForm.value.originalPhotoPath || null;
+          let uploadedPath = null;
+          let nextPhotoPath = oldPhotoPath;
+
+          try {
+            if (sessionPhotoFile.value) {
+              uploadedPath = await uploadSessionPhoto(sessionId);
+              nextPhotoPath = uploadedPath;
+            } else if (!sessionForm.value.photoPath) {
+              nextPhotoPath = null;
+            }
+
+            if (editedId) {
+              const { error } = await sb.rpc('update_session_details_v2', {
+                p_session_id: editedId,
+                p_start_at: values.start,
+                p_end_at: values.end,
+                p_venue: values.venue,
+                p_category: values.category,
+                p_capacity: values.capacity,
+                p_default_price: values.price,
+                p_default_package_units: values.units,
+                p_registration_deadline: values.registrationDeadline,
+                p_public_note: values.publicNote,
+                p_internal_note: values.internalNote,
+                p_photo_path: nextPhotoPath
+              });
+              if (error) throw error;
+            } else {
+              const { error } = await sb.from('sessions').insert({
+                id: sessionId,
+                start_at: values.start,
+                end_at: values.end,
+                venue: values.venue,
+                category: values.category,
+                capacity: values.capacity,
+                default_price: values.price,
+                default_package_units: values.units,
+                registration_deadline: values.registrationDeadline,
+                cancel_deadline: null,
+                status: 'open',
+                public_note: values.publicNote,
+                internal_note: values.internalNote,
+                photo_path: nextPhotoPath,
+                created_by: profile.value.id
+              });
+              if (error) throw error;
+            }
+
+            if (oldPhotoPath && oldPhotoPath !== nextPhotoPath) {
+              await sb.storage.from('session-images').remove([oldPhotoPath]);
+            }
+          } catch (innerError) {
+            if (uploadedPath) await sb.storage.from('session-images').remove([uploadedPath]);
+            throw innerError;
           }
 
-          const editedId = sessionForm.value.id;
           showCreateSession.value = false;
           resetSessionForm();
+          sessionPhotoFile.value = null;
+          if (sessionPhotoPreview.value) URL.revokeObjectURL(sessionPhotoPreview.value);
+          sessionPhotoPreview.value = '';
           await Promise.all([loadAdminSessions(), loadPublicSessions()]);
           if (editedId && adminSelectedSession.value?.session_id === editedId) await refreshAdminDetail();
           showToast(editedId ? '場次已更新' : '新場次已建立並開放報名');
-        } catch (e) { showToast(e?.message || String(e)); }
+        } catch (e) { showToast(friendlyError(e)); }
         finally { adminActionLoading.value = false; }
       }
 
@@ -2249,34 +2761,38 @@
 
       return {
         booting, user, profile, activeTab, subView, toast,
-        publicSessions, sessionsLoading, filteredPublicSessions, SESSION_PLACEHOLDER_IMAGE,
+        publicSessions, publicSessionsHasMore, sessionsLoading, filteredPublicSessions, SESSION_PLACEHOLDER_IMAGE,
         selectedSession, publicRoster, rosterLoading, canBookSelectedSession,
         showAuth, authMode, authLoading, authError, authForm, showPassword,
         showBooking, bookingLoading, bookingError, bookingForm,
         recordsMode, recordsLoading, myBookings, myFinance, packageBalance,
         myBookingsHasMore, myFinanceHasMore,
-        showProfile, profileLoading, profileError, profileForm,
+        showProfile, profileLoading, profileError, profileForm, ownPhoneEdit, ownPhoneLoading, ownPhoneError, ownPhoneForm,
+        ownPasswordEdit, ownPasswordLoading, ownPasswordError, ownPasswordForm,
         showSubstitute, substituteLoading, substituteForm, substituteContext,
-        adminMode, adminSessions, adminSelectedSession, adminRoster, adminRosterLoading,
+        adminMode, adminSessions, adminSessionsHasMore, adminSelectedSession, adminRoster, adminRosterLoading,
         adminActionLoading, adminFinance, adminFinanceHasMore, financeFilter,
         adminPlayers, adminPlayersLoading, adminPlayersHasMore, adminPlayerSearch,
         showAdminPlayer, adminPlayerTarget, adminPlayerHistory, adminPlayerHistoryLoading, adminPlayerHistoryHasMore,
-        showAccountSettings, accountManageLoading, accountManageError, accountSettingsForm,
+        showAccountSettings, accountManageLoading, accountManageError, accountSettingsForm, deleteEligibility,
         showPasswordReset, passwordResetLoading, passwordResetError, passwordResetForm, showResetPassword, showResetPasswordConfirm,
         packagePlans, activePackagePlans, selectedPackagePlanId, showPackagePlans, adminAdjustmentForm, packagePlanForm,
-        showFinanceEdit, financeEditForm, showCreateSession, sessionForm,
-        loadMoreAdminPlayerHistory, money, signedUnits, formatDateShort, formatDateLong, formatTimeRange, formatDateTime, formatDeadline,
+        showFinanceEdit, financeEditForm, showCreateSession, sessionForm, sessionPhotoFile, sessionPhotoPreview, timeOptions,
+        settledNoteEditing, settledNoteSaving, settledNoteDraft,
+        loadMoreAdminPlayerHistory, money, formatDupr, signedUnits, formatDateShort, formatDateLong, formatTimeRange, formatDateTime, formatDeadline,
+        sessionDatePart, sessionTimePart, setSessionDateTimePart, sessionImageUrl,
         sessionProgress, sessionStatusText, sessionStatusClass, sessionDbStatusText,
-        showToast, loadPublicSessions, viewSession, closeSubView, goTab,
+        showToast, loadPublicSessions, loadMorePublicSessions, viewSession, closeSubView, goTab,
         openAuth, switchAuthMode, submitAuth, logout,
         startBooking, setBookingMode, submitBooking,
         loadMyData, loadMoreBookings, loadMoreFinance,
         cancelMyBooking, openSubstitute, openAdminSubstitute, submitSubstitute, cancelAdminBooking,
-        openProfile, saveProfile,
-        openAdminSession, confirmFinance, reopenFinance, openFinanceEdit, saveFinanceEdit,
-        openCreateSession, openEditSession, saveSession, cancelCurrentSession, settleCurrentSession,
-        openAdminPlayers, loadAdminPlayers, loadMoreAdminPlayers, openAdminPlayer,
-        openAdminAccountSettings, saveAdminPlayerPhone, toggleAdminPlayerStatus, openAdminPasswordResetFromSettings,
+        openProfile, saveProfile, toggleOwnPhoneEdit, changeOwnPhone, toggleOwnPasswordEdit, changeOwnPassword,
+        openAdminSession, startSettledNoteEdit, cancelSettledNoteEdit, saveSettledInternalNote,
+        confirmFinance, reopenFinance, openFinanceEdit, saveFinanceEdit,
+        openCreateSession, openEditSession, applySessionTimeDefaults, handleSessionPhotoChange, clearSessionPhoto, saveSession, cancelCurrentSession, settleCurrentSession,
+        openAdminPlayers, loadAdminSessions, loadMoreAdminSessions, loadAdminPlayers, loadMoreAdminPlayers, openAdminPlayer,
+        openAdminAccountSettings, saveAdminPlayerPhone, toggleAdminPlayerStatus, deleteAdminPlayer, openAdminPasswordResetFromSettings,
         openAdminPasswordReset, submitAdminPasswordReset, purchasePackageForPlayer, addPlayerAdjustment,
         openPackagePlans, editPackagePlan, resetPackagePlanForm, savePackagePlan,
         openAdminFinance, loadAdminFinance, loadMoreAdminFinance, exportFinanceCsv
