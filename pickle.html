@@ -32,7 +32,7 @@
             canvas: '#FAFAF8'
           },
           boxShadow: {
-            card: '0 8px 28px rgba(31, 41, 55, 0.07)',
+            card: '0 8px 28px rgba(31, 41, 55, 0.1)',
             float: '0 18px 55px rgba(31, 41, 55, 0.16)'
           },
           fontFamily: {
@@ -46,7 +46,7 @@
   <style>
     :root { color-scheme: light; }
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; background: #FFFFFF; }
+    html, body { margin: 0; min-height: 100%; background: #f8f8f8; }
     body { font-family: "Noto Sans TC", system-ui, sans-serif; color: #1F2937; font-size: 16px; }
     button, input, textarea, select { font: inherit; }
     button { min-height: 46px; }
@@ -90,8 +90,8 @@
             <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 5.2c2 3.1 2.1 10.2 0 13.6"/><path d="M16 5.2c-2 3.1-2.1 10.2 0 13.6"/><path d="M3.7 9.6h16.6"/><path d="M3.7 14.4h16.6"/></svg>
           </div>
           <div class="min-w-0">
-            <div class="font-bold text-[21px] leading-tight tracking-tight">匹克球球敘</div>
-            <div class="text-[13px] text-muted mt-0.5">簡單報名・人工核款・紀錄清楚</div>
+            <div class="font-bold text-[21px] leading-tight tracking-tight">匹克球預約系統</div>
+            <div class="text-[13px] text-muted mt-0.5">v1.0</div>
           </div>
         </div>
 
@@ -290,11 +290,11 @@
                     <div v-if="row.operator" class="text-[12px] text-gray-400 mt-1">審核：{{ row.operator }}</div>
                   </div>
                   <span class="shrink-0 text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.booking_status === 'cancelled' ? 'bg-gray-100 text-gray-500' : (row.financial_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')">
-                    {{ row.booking_status === 'cancelled' ? '已取消' : (row.financial_status === 'confirmed' ? '已收款' : '待確認') }}
+                    {{ row.booking_status === 'cancelled' ? '已取消' : (row.financial_status === 'confirmed' ? '已付款' : '待確認') }}
                   </span>
                 </div>
 
-                <div v-if="row.financial_entry_id && (Number(row.amount || 0) !== 0 || Number(row.package_delta || 0) !== 0 || row.financial_note)" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text">
+                <div v-if="row.financial_entry_id && (Number(row.amount || 0) !== 0 || Number(row.package_delta || 0) !== 0 || row.financial_note)" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text border border-solid border-[#e5e5e5]">
                   <div v-if="Number(row.amount || 0) !== 0" class="flex justify-between gap-4">
                     <span class="text-muted">金額</span>
                     <span class="font-semibold">NT$ {{ money(row.amount) }}</span>
@@ -308,7 +308,7 @@
                     <span class="font-medium text-right">{{ row.financial_note }}</span>
                   </div>
                 </div>
-                <div v-else-if="!row.financial_entry_id" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text text-muted">未保留待確認財務紀錄</div>
+                <div v-else-if="!row.financial_entry_id" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text border border-solid border-[#e5e5e5] text-muted">未保留待確認財務紀錄</div>
 
                 <div v-if="adminSelectedSession.status === 'open' && row.booking_status === 'active'" class="mt-3">
                   <div class="flex gap-2">
@@ -336,9 +336,9 @@
         <section v-else key="primary">
           <!-- HOME -->
           <div v-if="activeTab === 'home'" class="px-4 py-5">
-            <div class="rounded-[22px] bg-gradient-to-br from-brand-500 to-brand-700 text-white p-5 shadow-card">
-              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2.5 py-1 text-[13px] font-bold tracking-wide">v1.0.18</span>
-              <h1 class="text-[27px] font-bold leading-tight mt-3">近期球敘</h1>
+            <div class="rounded-[20px] bg-gradient-to-br from-brand-500 to-brand-700 text-white p-4 shadow-card">
+              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2 py-1 text-[12px] font-bold tracking-wide">新手友善・多元活動・友善環境</span>
+              <h1 class="text-[24px] font-bold leading-tight mt-2">快速預約、即刻開打！<br>快來揪團加入最夯匹克球！</h1>
             </div>
 
             <div v-if="sessionsLoading" class="py-14 flex justify-center"><div class="w-8 h-8 rounded-full border-[3px] border-brand-100 border-t-brand-500 animate-spin"></div></div>
@@ -434,7 +434,7 @@
                       <div class="font-bold text-[20px] mt-1">{{ formatDateShort(row.start_at) }}</div>
                       <div class="text-[16px] font-semibold mt-1">{{ formatTimeRange(row.start_at, row.end_at) }}</div>
                     </div>
-                    <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.payment_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">{{ row.payment_status === 'confirmed' ? '已收款' : '待確認' }}</span>
+                    <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.payment_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">{{ row.payment_status === 'confirmed' ? '已付款' : '待確認' }}</span>
                   </div>
                   <div class="data-text text-muted mt-3 flex items-center gap-2">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
@@ -442,7 +442,7 @@
                   </div>
                   <div v-if="!row.is_my_participation" class="mt-3 rounded-xl bg-brand-50 px-3 py-2 data-text text-brand-700 font-semibold">代報：{{ row.participant_nickname }}</div>
 
-                  <div class="mt-4 rounded-2xl bg-gray-50 p-4 data-text">
+                  <div class="mt-4 rounded-2xl bg-gray-50 p-4 data-text border border-solid border-[#e5e5e5]">
                     <div class="flex justify-between"><span class="text-muted">金額</span><span class="font-semibold">NT$ {{ money(row.amount || 0) }}</span></div>
                     <div class="flex justify-between mt-2"><span class="text-muted">套票</span><span class="font-semibold">{{ signedUnits(row.package_delta || 0) }}</span></div>
                     <div class="flex justify-between mt-2"><span class="text-muted">場次狀態</span><span class="font-semibold">{{ sessionDbStatusText(row.session_status) }}</span></div>
@@ -503,8 +503,8 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
                   </div>
                   <div>
-                    <div class="font-bold text-[18px]">付款與聯絡</div>
-                    <p class="text-muted leading-7 mt-1 mb-0">付款後由主辦方人工核對。匯款帳戶、LINE Pay 與聯絡連結將由主辦方於正式上線前設定。</p>
+                    <div class="font-bold text-[16px]">付款與聯絡</div>
+                    <p class="text-muted leading-5 mt-0.5 mb-0 text-[13px]">付款後由主辦方人工核對，可接受匯款帳戶、LINE Pay。聯絡主辦方式：louis200630@gmail.com。</p>
                   </div>
                 </div>
               </div>
