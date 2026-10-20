@@ -132,7 +132,7 @@
                   <div class="w-9 h-9 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </div>
-                  <a v-if="selectedSession.venue_url" :href="selectedSession.venue_url" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-700 underline underline-offset-2 decoration-brand-300 hover:text-brand-800">{{ selectedSession.venue }}</a>
+                  <a v-if="selectedSession.venue_url" :href="selectedSession.venue_url" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-700 hover:text-brand-800">{{ selectedSession.venue }}</a>
                   <span v-else class="font-medium">{{ selectedSession.venue }}</span>
                 </div>
                 <div class="flex items-center gap-3 text-gray-700">
@@ -357,7 +357,7 @@
                   <div>
                     <div class="text-[14px] font-bold text-brand-600 mb-1 flex items-center gap-1.5">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      <a v-if="session.venue_url" :href="session.venue_url" target="_blank" rel="noopener noreferrer" class="underline underline-offset-2 decoration-brand-300 hover:text-brand-700" @click.stop>{{ session.venue }}</a>
+                      <a v-if="session.venue_url" :href="session.venue_url" target="_blank" rel="noopener noreferrer" class="hover:text-brand-700" @click.stop>{{ session.venue }}</a>
                       <span v-else>{{ session.venue }}</span>
                     </div>
                     <div class="text-[22px] font-bold tracking-tight">{{ formatDateShort(session.start_at) }}</div>
