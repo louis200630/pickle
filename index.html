@@ -268,6 +268,9 @@
             <button v-if="adminSelectedSession.status === 'open'" @click="settleCurrentSession" :disabled="adminSelectedSession.pending_count > 0 || adminActionLoading" class="mt-2 w-full rounded-xl py-3 font-bold transition" :class="adminSelectedSession.pending_count === 0 ? 'bg-ink text-white' : 'bg-gray-200 text-gray-500'">
               {{ adminSelectedSession.pending_count > 0 ? `尚有 ${adminSelectedSession.pending_count} 人待確認` : '完成本場結算' }}
             </button>
+            <button v-if="adminSelectedSession.status === 'settled'" @click="syncCurrentSessionFinance" :disabled="adminActionLoading" class="mt-2 w-full rounded-xl py-3 font-bold transition bg-brand-600 text-white disabled:opacity-50">
+              同步／重新同步財務報表
+            </button>
           </div>
 
           <div class="mt-4 bg-white rounded-[22px] border border-line shadow-card overflow-hidden">
@@ -2798,14 +2801,51 @@
         }
       }
 
-      async function settleCurrentSession() {
-        if (!confirm('確認本場名單與費用皆已核對完成，並正式結算？\n\n結算後原始紀錄不可直接修改。')) return;
+      async function requestFinanceSync(sessionId) {
+        const { data, error } = await sb.functions.invoke('sync-session-finance', {
+          body: { session_id: sessionId }
+        });
+        if (error) throw error;
+        if (!data?.synced) throw new Error(data?.error || '財務同步尚未成功');
+        return data;
+      }
+
+      async function syncCurrentSessionFinance() {
+        const sessionId = adminSelectedSession.value?.session_id;
+        if (!sessionId || adminSelectedSession.value?.status !== 'settled') return;
         adminActionLoading.value = true;
-        const { error } = await sb.rpc('settle_session', { p_session_id: adminSelectedSession.value.session_id, p_settlement_note: '由管理端完成結算' });
-        adminActionLoading.value = false;
-        if (error) { showToast(friendlyError(error)); return; }
-        await Promise.all([refreshAdminDetail(), loadPublicSessions()]);
-        showToast('場次已完成結算');
+        try {
+          const data = await requestFinanceSync(sessionId);
+          showToast(`已同步至財務總表第 ${data.sheet_row} 列，收入 NT$ ${Number(data.revenue).toLocaleString('en-US')}`);
+        } catch (e) {
+          showToast('同步未完成，可點選重新同步：' + friendlyError(e));
+        } finally {
+          adminActionLoading.value = false;
+        }
+      }
+
+      async function settleCurrentSession() {
+        if (!confirm('確認本場名單與費用皆已核對完成，並正式結算？\\n\\n結算後原始紀錄不可直接修改。')) return;
+        const sessionId = adminSelectedSession.value.session_id;
+        adminActionLoading.value = true;
+        try {
+          const { error } = await sb.rpc('settle_session', {
+            p_session_id: sessionId, p_settlement_note: '由管理端完成結算'
+          });
+          if (error) throw error;
+          await Promise.all([refreshAdminDetail(), loadPublicSessions()]);
+          try {
+            const data = await requestFinanceSync(sessionId);
+            showToast(`場次已結算，財務已同步 NT$ ${Number(data.revenue).toLocaleString('en-US')}`);
+          } catch (syncError) {
+            showToast('場次已正式結算，但財務同步未完成；請點選「同步／重新同步財務報表」');
+            console.error('Finance sync failed', syncError);
+          }
+        } catch (e) {
+          showToast(friendlyError(e));
+        } finally {
+          adminActionLoading.value = false;
+        }
       }
 
       function toIsoOrNull(value) {
@@ -3075,7 +3115,7 @@
         openProfile, saveProfile, toggleOwnPhoneEdit, changeOwnPhone, toggleOwnPasswordEdit, changeOwnPassword,
         openAdminSession, startSettledNoteEdit, cancelSettledNoteEdit, saveSettledInternalNote,
         confirmFinance, reopenFinance, openFinanceEdit, saveFinanceEdit,
-        openCreateSession, openEditSession, applySessionTimeDefaults, handleSessionPhotoChange, clearSessionPhoto, saveSession, cancelCurrentSession, settleCurrentSession,
+        openCreateSession, openEditSession, applySessionTimeDefaults, handleSessionPhotoChange, clearSessionPhoto, saveSession, cancelCurrentSession, syncCurrentSessionFinance, settleCurrentSession,
         openAdminPlayers, openCreateGuestPlayer, createGuestPlayer, loadAdminSessions, loadMoreAdminSessions, loadAdminPlayers, loadMoreAdminPlayers, openAdminPlayer,
         openAdminAccountSettings, saveAdminPlayerPhone, toggleAdminPlayerStatus, deleteAdminPlayer, openAdminPasswordResetFromSettings,
         openAdminPasswordReset, submitAdminPasswordReset, purchasePackageForPlayer, addPlayerAdjustment,
