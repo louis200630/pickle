@@ -900,8 +900,9 @@
               <div class="text-[34px] font-bold mt-1">{{ adminPlayerTarget?.package_balance ?? 0 }} <span class="text-[15px] font-medium">次</span></div>
             </div>
 
-            <div v-if="adminPlayerTarget?.is_registered && adminPlayerTarget?.account_status !== 'disabled'" class="mt-4 rounded-2xl border border-line p-4">
+            <div v-if="adminPlayerTarget?.account_status !== 'disabled'" class="mt-4 rounded-2xl border border-line p-4">
               <div class="font-bold text-[18px]">購買套票</div>
+              <div v-if="!adminPlayerTarget?.is_registered" class="text-[13px] text-muted mt-1">未註冊球友也可先建立套票與財務紀錄；之後用相同手機註冊時會自動保留。</div>
               <select v-model="selectedPackagePlanId" class="mt-3 w-full h-12 rounded-xl border border-line px-3 bg-white">
                 <option value="">選擇套票方案</option>
                 <option v-for="plan in activePackagePlans" :key="plan.plan_id" :value="plan.plan_id">{{ plan.name }} · {{ plan.units }} 次 · NT$ {{ money(plan.price) }}</option>
@@ -909,17 +910,17 @@
               <button @click="purchasePackageForPlayer" :disabled="adminActionLoading || !selectedPackagePlanId" class="mt-3 w-full rounded-xl bg-brand-500 text-white font-bold py-3 disabled:opacity-50">確認新增套票</button>
             </div>
 
-            <div v-else class="mt-4 rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-[14px] text-brand-700 font-semibold">
-              註冊帳號後才可使用套票；目前僅可做金額修正。
+            <div v-else class="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-[14px] text-red-700 font-semibold">
+              此球友帳號已停用，暫時不能新增套票或財務紀錄。
             </div>
 
 
             <div class="mt-4 rounded-2xl border border-line p-4">
               <div class="font-bold text-[18px]">人工調整</div>
               <div class="text-[13px] text-muted mt-1">歷史不直接修改；需要修正時新增一筆調整紀錄。</div>
-              <div :class="adminPlayerTarget?.is_registered ? 'grid grid-cols-2 gap-3 mt-3' : 'mt-3'">
+              <div class="grid grid-cols-2 gap-3 mt-3">
                 <div><label class="text-[14px] font-bold block mb-1.5">金額增減</label><input v-model.number="adminAdjustmentForm.amount" type="number" class="w-full h-12 rounded-xl border border-line px-3" placeholder="0"></div>
-                <div v-if="adminPlayerTarget?.is_registered"><label class="text-[14px] font-bold block mb-1.5">套票增減</label><input v-model.number="adminAdjustmentForm.packageDelta" type="number" class="w-full h-12 rounded-xl border border-line px-3" placeholder="0"></div>
+                <div><label class="text-[14px] font-bold block mb-1.5">套票增減</label><input v-model.number="adminAdjustmentForm.packageDelta" type="number" class="w-full h-12 rounded-xl border border-line px-3" placeholder="0"></div>
               </div>
               <div class="mt-3"><label class="text-[14px] font-bold block mb-1.5">原因備註</label><input v-model.trim="adminAdjustmentForm.note" class="w-full h-12 rounded-xl border border-line px-4" placeholder="例如：補回一次、人工退款"></div>
               <button @click="addPlayerAdjustment" :disabled="adminActionLoading" class="mt-3 w-full rounded-xl border border-brand-200 bg-brand-50 text-brand-700 font-bold py-3 disabled:opacity-50">新增調整紀錄</button>
@@ -950,6 +951,40 @@
                 <button v-if="adminPlayerHistoryHasMore" @click="loadMoreAdminPlayerHistory" class="mt-3 w-full rounded-xl border border-brand-200 bg-brand-50 text-brand-700 font-bold py-3">載入更多財務紀錄</button>
               </div>
             </div>
+          </div>
+        </Transition>
+      </div>
+    </Transition>
+
+    <!-- CREATE GUEST PLAYER SHEET -->
+    <Transition name="fade">
+      <div v-if="showCreateGuestPlayer" class="absolute inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-end" @click.self="showCreateGuestPlayer = false">
+        <Transition name="sheet" appear>
+          <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float">
+            <div class="flex justify-between items-center">
+              <div>
+                <div class="text-[14px] font-bold text-brand-600">PLAYER</div>
+                <h2 class="text-[24px] font-bold mt-1">新增未註冊球友</h2>
+              </div>
+              <button @click="showCreateGuestPlayer = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div v-if="guestPlayerError" class="mt-4 rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 text-[14px]">{{ guestPlayerError }}</div>
+
+            <div class="mt-5">
+              <label class="font-bold block mb-2">球場暱稱</label>
+              <input v-model.trim="guestPlayerForm.nickname" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="例如：小明">
+            </div>
+
+            <div class="mt-4">
+              <label class="font-bold block mb-2">手機號碼</label>
+              <input v-model.trim="guestPlayerForm.phone" type="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="09xxxxxxxx">
+              <div class="text-[13px] text-muted mt-2">手機是歷史紀錄的主要識別。之後用相同手機註冊，套票與財務會自動保留。</div>
+            </div>
+
+            <button @click="createGuestPlayer" :disabled="guestPlayerLoading" class="mt-5 w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ guestPlayerLoading ? '建立中…' : '建立球友並設定帳務' }}</button>
           </div>
         </Transition>
       </div>
@@ -1281,6 +1316,10 @@
       const adminPlayerSearch = ref('');
       const showAdminPlayer = ref(false);
       const adminPlayerTarget = ref(null);
+      const showCreateGuestPlayer = ref(false);
+      const guestPlayerLoading = ref(false);
+      const guestPlayerError = ref('');
+      const guestPlayerForm = ref({ nickname: '', phone: '' });
       const showAccountSettings = ref(false);
       const accountManageLoading = ref(false);
       const accountManageError = ref('');
@@ -1588,6 +1627,51 @@
         await loadAdminSessions(false);
       }
 
+      function openCreateGuestPlayer() {
+        guestPlayerError.value = '';
+        guestPlayerForm.value = { nickname: '', phone: '' };
+        showCreateGuestPlayer.value = true;
+      }
+
+      async function createGuestPlayer() {
+        guestPlayerError.value = '';
+        const nickname = guestPlayerForm.value.nickname.trim();
+        if (!nickname) {
+          guestPlayerError.value = '請輸入球場暱稱';
+          return;
+        }
+
+        const phone = String(guestPlayerForm.value.phone || '').replace(/[^0-9]/g, '');
+        if (!/^09\d{8}$/.test(phone)) {
+          guestPlayerError.value = '請輸入正確的台灣手機號碼';
+          return;
+        }
+
+        guestPlayerLoading.value = true;
+        try {
+          const { data, error } = await sb.rpc('admin_create_guest_player', {
+            p_phone: phone,
+            p_nickname: nickname
+          });
+          if (error) throw error;
+
+          const result = Array.isArray(data) ? data[0] : data;
+          showCreateGuestPlayer.value = false;
+          adminPlayerSearch.value = phone;
+          await loadAdminPlayers(true);
+
+          const row = adminPlayers.value.find(p => p.player_id === result?.player_id)
+            || adminPlayers.value.find(p => p.phone === phone);
+
+          if (row) await openAdminPlayer(row);
+          showToast(result?.created ? '未註冊球友已新增' : '此手機已有球友資料，已開啟');
+        } catch (e) {
+          guestPlayerError.value = friendlyError(e);
+        } finally {
+          guestPlayerLoading.value = false;
+        }
+      }
+
       async function openAdminPlayers() {
         adminMode.value = 'players';
         await Promise.all([loadAdminPlayers(true), loadPackagePlans()]);
@@ -1863,10 +1947,6 @@
 
       async function purchasePackageForPlayer() {
         if (!adminPlayerTarget.value || !selectedPackagePlanId.value) return;
-        if (!adminPlayerTarget.value.is_registered) {
-          showToast('未註冊球友不能使用套票');
-          return;
-        }
         const plan = packagePlans.value.find(p => p.plan_id === selectedPackagePlanId.value);
         if (!plan) return;
         if (!confirm(`確認替 ${adminPlayerTarget.value.nickname} 新增「${plan.name}」？`)) return;
@@ -1887,8 +1967,7 @@
       async function addPlayerAdjustment() {
         if (!adminPlayerTarget.value) return;
         const amount = Number(adminAdjustmentForm.value.amount || 0);
-        let packageDelta = Number(adminAdjustmentForm.value.packageDelta || 0);
-        if (!adminPlayerTarget.value.is_registered) packageDelta = 0;
+        const packageDelta = Number(adminAdjustmentForm.value.packageDelta || 0);
         const note = adminAdjustmentForm.value.note.trim();
         if (amount === 0 && packageDelta === 0) { showToast('請輸入金額或套票調整'); return; }
         if (!note) { showToast('人工調整必須填寫原因'); return; }
@@ -2798,6 +2877,7 @@
         adminActionLoading, adminFinance, adminFinanceHasMore, financeFilter,
         adminPlayers, adminPlayersLoading, adminPlayersHasMore, adminPlayerSearch,
         showAdminPlayer, adminPlayerTarget, adminPlayerHistory, adminPlayerHistoryLoading, adminPlayerHistoryHasMore,
+        showCreateGuestPlayer, guestPlayerLoading, guestPlayerError, guestPlayerForm,
         showAccountSettings, accountManageLoading, accountManageError, accountSettingsForm, deleteEligibility,
         showPasswordReset, passwordResetLoading, passwordResetError, passwordResetForm, showResetPassword, showResetPasswordConfirm,
         packagePlans, activePackagePlans, selectedPackagePlanId, showPackagePlans, adminAdjustmentForm, packagePlanForm,
@@ -2815,7 +2895,7 @@
         openAdminSession, startSettledNoteEdit, cancelSettledNoteEdit, saveSettledInternalNote,
         confirmFinance, reopenFinance, openFinanceEdit, saveFinanceEdit,
         openCreateSession, openEditSession, applySessionTimeDefaults, handleSessionPhotoChange, clearSessionPhoto, saveSession, cancelCurrentSession, settleCurrentSession,
-        openAdminPlayers, loadAdminSessions, loadMoreAdminSessions, loadAdminPlayers, loadMoreAdminPlayers, openAdminPlayer,
+        openAdminPlayers, openCreateGuestPlayer, createGuestPlayer, loadAdminSessions, loadMoreAdminSessions, loadAdminPlayers, loadMoreAdminPlayers, openAdminPlayer,
         openAdminAccountSettings, saveAdminPlayerPhone, toggleAdminPlayerStatus, deleteAdminPlayer, openAdminPasswordResetFromSettings,
         openAdminPasswordReset, submitAdminPasswordReset, purchasePackageForPlayer, addPlayerAdjustment,
         openPackagePlans, editPackagePlan, resetPackagePlanForm, savePackagePlan,
