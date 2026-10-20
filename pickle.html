@@ -345,15 +345,15 @@
               <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2 py-1 text-[12px] font-bold tracking-wide">新手友善・多元活動・友善環境</span>
               <h1 class="text-[24px] font-bold leading-tight mt-2">快速預約、即刻開打！<br>快來揪團加入最夯匹克球！</h1>
 
-              <div class="mt-3 pt-3 border-t border-white/20">
+              <div>
                 <div class="flex justify-end">
                   <button
                     @click="homeIntroExpanded = !homeIntroExpanded"
                     type="button"
+                    style="position: absolute; right: 30px; top: 35px;"
                     class="min-h-0 h-8 px-2.5 rounded-lg bg-white/10 border border-white/15 text-white/90 text-[12px] font-bold inline-flex items-center gap-1.5 hover:bg-white/15 active:scale-[.98] transition"
                     :aria-expanded="homeIntroExpanded"
                   >
-                    <span>{{ homeIntroExpanded ? '收合' : '展開' }}</span>
                     <svg
                       width="14"
                       height="14"
@@ -372,7 +372,7 @@
                 </div>
 
                 <Transition name="fade">
-                  <div v-if="homeIntroExpanded" class="mt-2 text-[13px] leading-6 text-white/90">
+                  <div v-if="homeIntroExpanded" class="mt-5 text-[13px] leading-6 text-white/90">
                     <p class="m-0">運動生活的充電站！🔋 一起享受最 Pickle Star 的生活！🎾</p>
 
                     <div class="mt-3">
@@ -559,6 +559,7 @@
                     <div class="font-bold text-[16px]">付款與聯絡</div>
                     <p class="text-muted leading-5 mt-0.5 mb-0 text-[13px]">付款後由主辦方人工核對，可接受匯款帳戶、LINE Pay。
                       <br>(013)國泰世華 帳號：041500171781
+                      <br>匯款請告知帳號後五碼，或備註給主辦方，感謝您。
                       <br>聯絡主辦方式：louis200630@gmail.com。</p>
                   </div>
                 </div>
