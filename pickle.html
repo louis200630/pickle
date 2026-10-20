@@ -2786,16 +2786,16 @@
       }
 
       function resetSessionForm() {
-        const defaultStart = `${localDateString()}T19:00`;
+        const defaultStart = `${localDateString()}T20:00`;
 
         sessionForm.value = {
           id: null,
           start: defaultStart,
-          end: shiftLocalDateTimeInput(defaultStart, 3),
+          end: shiftLocalDateTimeInput(defaultStart, 2),
           venue: 'Pickle Fever (泰山館)',
           category: '一般場',
-          capacity: 8,
-          price: 500,
+          capacity: 20,
+          price: 420,
           units: 1,
           registrationDeadline: shiftLocalDateTimeInput(defaultStart, -1),
           publicNote: '',
