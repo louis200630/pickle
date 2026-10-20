@@ -2577,10 +2577,23 @@
       }
 
       function resetSessionForm() {
+        const defaultStart = `${localDateString()}T19:00`;
+
         sessionForm.value = {
-          id: null, start: '', end: '', venue: '', category: '一般場', capacity: 8,
-          price: 500, units: 1, registrationDeadline: '',
-          publicNote: '', internalNote: '', photoPath: '', originalPhotoPath: '', lockPricing: false
+          id: null,
+          start: defaultStart,
+          end: shiftLocalDateTimeInput(defaultStart, 3),
+          venue: 'Pickle Fever (泰山館)',
+          category: '一般場',
+          capacity: 8,
+          price: 500,
+          units: 1,
+          registrationDeadline: shiftLocalDateTimeInput(defaultStart, -1),
+          publicNote: '',
+          internalNote: '',
+          photoPath: '',
+          originalPhotoPath: '',
+          lockPricing: false
         };
       }
 
