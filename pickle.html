@@ -132,7 +132,8 @@
                   <div class="w-9 h-9 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   </div>
-                  <span class="font-medium">{{ selectedSession.venue }}</span>
+                  <a v-if="selectedSession.venue_url" :href="selectedSession.venue_url" target="_blank" rel="noopener noreferrer" class="font-medium text-brand-700 underline underline-offset-2 decoration-brand-300 hover:text-brand-800">{{ selectedSession.venue }}</a>
+                  <span v-else class="font-medium">{{ selectedSession.venue }}</span>
                 </div>
                 <div class="flex items-center gap-3 text-gray-700">
                   <div class="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 shrink-0">
@@ -356,7 +357,8 @@
                   <div>
                     <div class="text-[14px] font-bold text-brand-600 mb-1 flex items-center gap-1.5">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 12-9 12S3 17 3 10a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                      <span>{{ session.venue }}</span>
+                      <a v-if="session.venue_url" :href="session.venue_url" target="_blank" rel="noopener noreferrer" class="underline underline-offset-2 decoration-brand-300 hover:text-brand-700" @click.stop>{{ session.venue }}</a>
+                      <span v-else>{{ session.venue }}</span>
                     </div>
                     <div class="text-[22px] font-bold tracking-tight">{{ formatDateShort(session.start_at) }}</div>
                     <div class="text-[17px] font-semibold mt-1">{{ formatTimeRange(session.start_at, session.end_at) }}</div>
@@ -1222,6 +1224,11 @@
               </div>
               <div><label class="font-bold block mb-2">場地</label><input v-model.trim="sessionForm.venue" class="w-full h-12 rounded-xl border border-line px-4" placeholder="例如：Pickle Fever 泰山館"></div>
               <div>
+                <label class="font-bold block mb-2">場地位置連結</label>
+                <input v-model.trim="sessionForm.venueUrl" type="url" inputmode="url" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="https://maps.app.goo.gl/...">
+                <div class="text-[13px] text-muted mt-2">球友點擊場地名稱時會開啟此連結。</div>
+              </div>
+              <div>
                 <label class="font-bold block mb-2">場地照片</label>
                 <div class="rounded-2xl border border-line overflow-hidden bg-gray-50">
                   <div class="aspect-[16/9] overflow-hidden bg-gray-100"><img :src="sessionPhotoPreview || sessionImageUrl({ photo_path: sessionForm.photoPath })" class="w-full h-full object-cover" alt="場地照片預覽"></div>
@@ -1396,7 +1403,7 @@
       const settledNoteSaving = ref(false);
       const settledNoteDraft = ref('');
       const sessionForm = ref({
-        id: null, start: '', end: '', venue: '', category: '一般場', capacity: 8,
+        id: null, start: '', end: '', venue: '', venueUrl: 'https://maps.app.goo.gl/vpjVaUuDfBKvP3Vi7', category: '一般場', capacity: 8,
         price: 420, units: 1, registrationDeadline: '',
         publicNote: '', internalNote: '', photoPath: '', originalPhotoPath: '', lockPricing: false
       });
@@ -1451,6 +1458,7 @@
           [/Settled or cancelled sessions cannot be edited/i, '已結算或已取消的場次不能編輯'],
           [/Session end time must be after start time/i, '結束時間必須晚於開始時間'],
           [/Venue is required/i, '請填寫場地'],
+          [/Venue URL must start with http:\/\/ or https:\/\//i, '場地位置連結請以 http:// 或 https:// 開頭'],
           [/Capacity must be greater than zero/i, '人數上限必須大於 0'],
           [/Capacity cannot be lower than the current active booking count|Capacity cannot be lower than the current active participant count/i, '人數上限不能少於目前已報名人數'],
           [/Not enough remaining spots for this party size/i, '剩餘名額不足，請減少團體報名人數'],
@@ -1612,7 +1620,7 @@
       async function loadPublicSessions(reset = true) {
         sessionsLoading.value = true;
         if (reset) publicSessionsOffset.value = 0;
-        const { data, error } = await sb.rpc('list_public_sessions', { p_limit: 30, p_offset: publicSessionsOffset.value, p_status: null });
+        const { data, error } = await sb.rpc('list_public_sessions_v2', { p_limit: 30, p_offset: publicSessionsOffset.value, p_status: null });
         sessionsLoading.value = false;
         if (error) { showToast(`場次載入失敗：${friendlyError(error)}`); return; }
         if (reset) publicSessions.value = data || [];
@@ -1689,7 +1697,7 @@
       async function loadAdminSessions(reset = true) {
         if (profile.value?.role !== 'admin') return;
         if (reset) adminSessionsOffset.value = 0;
-        const { data, error } = await sb.rpc('list_admin_sessions', { p_limit: 30, p_offset: adminSessionsOffset.value, p_status: null });
+        const { data, error } = await sb.rpc('list_admin_sessions_v2', { p_limit: 30, p_offset: adminSessionsOffset.value, p_status: null });
         if (error) { showToast(`管理場次載入失敗：${friendlyError(error)}`); return; }
         if (reset) adminSessions.value = data || [];
         else adminSessions.value.push(...(data || []));
@@ -2793,6 +2801,7 @@
           start: defaultStart,
           end: shiftLocalDateTimeInput(defaultStart, 2),
           venue: 'Pickle Fever (泰山館)',
+          venueUrl: 'https://maps.app.goo.gl/vpjVaUuDfBKvP3Vi7',
           category: '一般場',
           capacity: 20,
           price: 420,
@@ -2823,6 +2832,7 @@
           start: toTaipeiInput(session.start_at),
           end: toTaipeiInput(session.end_at),
           venue: session.venue || '',
+          venueUrl: session.venue_url || '',
           category: session.category || '一般場',
           capacity: Number(session.capacity || 8),
           price: Number(session.default_price || 0),
@@ -2881,11 +2891,13 @@
           const startAt = new Date(sessionForm.value.start);
           const endAt = new Date(sessionForm.value.end);
           if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt <= startAt) throw new Error('結束時間必須晚於開始時間');
+          if (sessionForm.value.venueUrl && !/^https?:\/\//i.test(sessionForm.value.venueUrl.trim())) throw new Error('場地位置連結請以 http:// 或 https:// 開頭');
 
           const values = {
             start: startAt.toISOString(),
             end: endAt.toISOString(),
             venue: sessionForm.value.venue,
+            venueUrl: sessionForm.value.venueUrl?.trim() || null,
             category: sessionForm.value.category || '一般場',
             capacity: Number(sessionForm.value.capacity || 8),
             price: Number(sessionForm.value.price || 0),
@@ -2910,11 +2922,12 @@
             }
 
             if (editedId) {
-              const { error } = await sb.rpc('update_session_details_v2', {
+              const { error } = await sb.rpc('update_session_details_v3', {
                 p_session_id: editedId,
                 p_start_at: values.start,
                 p_end_at: values.end,
                 p_venue: values.venue,
+                p_venue_url: values.venueUrl,
                 p_category: values.category,
                 p_capacity: values.capacity,
                 p_default_price: values.price,
@@ -2931,6 +2944,7 @@
                 start_at: values.start,
                 end_at: values.end,
                 venue: values.venue,
+                venue_url: values.venueUrl,
                 category: values.category,
                 capacity: values.capacity,
                 default_price: values.price,
