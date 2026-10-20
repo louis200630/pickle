@@ -341,7 +341,7 @@
         <section v-else key="primary">
           <!-- HOME -->
           <div v-if="activeTab === 'home'" class="px-4 py-5">
-            <div class="rounded-[20px] bg-gradient-to-br from-brand-500 to-brand-700 text-white p-4 shadow-card">
+            <div class="relative rounded-[20px] bg-gradient-to-br from-brand-500 to-brand-700 text-white p-4 shadow-card">
               <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2 py-1 text-[12px] font-bold tracking-wide">新手友善・多元活動・友善環境</span>
               <h1 class="text-[24px] font-bold leading-tight mt-2">快速預約、即刻開打！<br>快來揪團加入最夯匹克球！</h1>
 
@@ -350,7 +350,7 @@
                   <button
                     @click="homeIntroExpanded = !homeIntroExpanded"
                     type="button"
-                    style="position: absolute; right: 30px; top: 35px;"
+                    style="position: absolute; right: 20px; top: 18px;"
                     class="min-h-0 h-8 px-2.5 rounded-lg bg-white/10 border border-white/15 text-white/90 text-[12px] font-bold inline-flex items-center gap-1.5 hover:bg-white/15 active:scale-[.98] transition"
                     :aria-expanded="homeIntroExpanded"
                   >
