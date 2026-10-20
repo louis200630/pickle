@@ -168,15 +168,15 @@
           <div class="mt-4 bg-white rounded-[22px] border border-line shadow-card p-5">
             <div class="flex items-center justify-between mb-4">
               <h2 class="font-bold text-[19px]">目前名單</h2>
-              <span class="data-text text-muted">{{ publicRoster.length }} 人</span>
+              <span class="data-text text-muted">{{ selectedSession.registered_count }} 人</span>
             </div>
             <div v-if="rosterLoading" class="py-8 text-center text-muted">載入名單中…</div>
             <div v-else-if="publicRoster.length === 0" class="py-8 text-center text-muted">目前尚無報名</div>
             <div v-else class="divide-y divide-gray-100">
-              <div v-for="(row, index) in publicRoster" :key="row.booking_id" class="py-3 flex items-center gap-3">
+              <div v-for="(row, index) in expandedPublicRoster" :key="row.displayKey" class="py-3 flex items-center gap-3">
                 <div class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center text-[14px] font-bold">{{ index + 1 }}</div>
                 <div class="font-semibold flex-1 min-w-0 flex items-center gap-1.5 overflow-hidden">
-                  <span class="truncate">{{ row.nickname }}</span>
+                  <span class="truncate" :class="row.companion ? 'text-gray-500' : ''">{{ row.displayName }}</span>
                   <span v-if="row.dupr_rating != null" class="shrink-0 text-[10px] leading-none rounded-full bg-gray-100 text-gray-500 px-1.5 py-1 font-medium">{{ formatDupr(row.dupr_rating) }}</span>
                 </div>
                 <span class="text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.payment_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'">
@@ -265,14 +265,14 @@
             </div>
 
             <button v-if="adminSelectedSession.status === 'open'" @click="settleCurrentSession" :disabled="adminSelectedSession.pending_count > 0 || adminActionLoading" class="mt-2 w-full rounded-xl py-3 font-bold transition" :class="adminSelectedSession.pending_count === 0 ? 'bg-ink text-white' : 'bg-gray-200 text-gray-500'">
-              {{ adminSelectedSession.pending_count > 0 ? `尚有 ${adminSelectedSession.pending_count} 筆待確認` : '完成本場結算' }}
+              {{ adminSelectedSession.pending_count > 0 ? `尚有 ${adminSelectedSession.pending_count} 人待確認` : '完成本場結算' }}
             </button>
           </div>
 
           <div class="mt-4 bg-white rounded-[22px] border border-line shadow-card overflow-hidden">
             <div class="p-5 border-b border-gray-100 flex justify-between items-center">
               <h2 class="font-bold text-[19px]">報名名單</h2>
-              <span class="data-text text-muted">{{ adminRoster.length }} 筆</span>
+              <span class="data-text text-muted">{{ adminRosterParticipantCount }} 人 · {{ adminRoster.length }} 筆</span>
             </div>
             <div v-if="adminRosterLoading" class="p-8 text-center text-muted">載入名單中…</div>
             <div v-else-if="adminRoster.length === 0" class="p-8 text-center text-muted">目前沒有報名</div>
@@ -282,9 +282,13 @@
                   <div class="min-w-0">
                     <div class="font-bold text-[17px] flex items-center gap-2 flex-wrap">
                       <span>{{ row.nickname }}</span>
+                      <span v-if="Number(row.party_size || 1) > 1" class="text-[11px] leading-none rounded-full bg-brand-50 text-brand-700 px-2 py-1 font-bold">{{ row.party_size }} 位 · 同行 {{ Number(row.party_size) - 1 }}</span>
                       <span v-if="row.dupr_rating != null" class="text-[10px] leading-none rounded-full bg-gray-100 text-gray-500 px-1.5 py-1 font-medium">{{ formatDupr(row.dupr_rating) }}</span>
                     </div>
                     <div class="data-text text-muted mt-1">{{ row.phone }}</div>
+                    <div v-if="Number(row.party_size || 1) > 1" class="mt-2 flex flex-wrap gap-1.5">
+                      <span v-for="n in Number(row.party_size) - 1" :key="`${row.booking_id}-companion-${n}`" class="text-[12px] rounded-lg bg-gray-100 text-gray-500 px-2 py-1">同行 {{ n }}</span>
+                    </div>
                     <div v-if="row.original_player !== row.nickname" class="text-[14px] text-muted mt-1">原報名：{{ row.original_player }}</div>
                     <div v-if="row.booked_by && row.booked_by !== row.nickname" class="text-[12px] text-gray-400 mt-1">代報：{{ row.booked_by }}</div>
                     <div v-if="row.operator" class="text-[12px] text-gray-400 mt-1">審核：{{ row.operator }}</div>
@@ -441,6 +445,7 @@
                     <span>{{ row.category }}</span>
                   </div>
                   <div v-if="!row.is_my_participation" class="mt-3 rounded-xl bg-brand-50 px-3 py-2 data-text text-brand-700 font-semibold">代報：{{ row.participant_nickname }}</div>
+                  <div v-if="Number(row.party_size || 1) > 1" class="mt-3 rounded-xl bg-brand-50 px-3 py-2 data-text text-brand-700 font-semibold">{{ row.party_size }} 位 · 同行 {{ Number(row.party_size) - 1 }}</div>
 
                   <div class="mt-4 rounded-2xl bg-gray-50 p-4 data-text border border-solid border-[#e5e5e5]">
                     <div class="flex justify-between"><span class="text-muted">金額</span><span class="font-semibold">NT$ {{ money(row.amount || 0) }}</span></div>
@@ -504,7 +509,9 @@
                   </div>
                   <div>
                     <div class="font-bold text-[16px]">付款與聯絡</div>
-                    <p class="text-muted leading-5 mt-0.5 mb-0 text-[13px]">付款後由主辦方人工核對，可接受匯款帳戶、LINE Pay。聯絡主辦方式：louis200630@gmail.com。</p>
+                    <p class="text-muted leading-5 mt-0.5 mb-0 text-[13px]">付款後由主辦方人工核對，可接受匯款帳戶、LINE Pay。
+                      <br>(013)國泰世華 帳號：041500171781
+                      <br>聯絡主辦方式：louis200630@gmail.com。</p>
                   </div>
                 </div>
               </div>
@@ -668,6 +675,7 @@
                           <td class="px-3 py-3 whitespace-nowrap text-gray-600">{{ formatDateTime(row.created_at) }}</td>
                           <td class="px-3 py-3">
                             <div class="font-semibold">{{ row.nickname }}</div>
+                            <div v-if="Number(row.party_size || 1) > 1" class="text-[12px] text-brand-700 font-semibold mt-0.5">{{ row.party_size }} 位 · 同行 {{ Number(row.party_size) - 1 }}</div>
                             <div class="text-[13px] text-muted mt-0.5">{{ row.phone }}</div>
                           </td>
                           <td class="px-3 py-3 text-right font-medium">{{ row.package_balance_after ?? '—' }}</td>
@@ -801,8 +809,34 @@
 
             <div class="mt-4 flex flex-col gap-4">
               <div><label class="font-bold block mb-2">參加者暱稱</label><input v-model.trim="bookingForm.nickname" :readonly="bookingForm.mode === 'self'" type="text" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50"></div>
-              <div><label class="font-bold block mb-2">參加者手機</label><input v-model.trim="bookingForm.phone" :readonly="bookingForm.mode === 'self'" type="tel" inputmode="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50"></div>
-              <button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : '送出報名' }}</button>
+              <div>
+                <label class="font-bold block mb-2">參加者手機</label>
+                <input v-model.trim="bookingForm.phone" :readonly="bookingForm.mode === 'self'" type="tel" inputmode="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50">
+                <label v-if="bookingForm.mode === 'self'" class="mt-3 inline-flex items-center gap-2 cursor-pointer select-none">
+                  <input v-model="bookingForm.group" @change="toggleGroupBooking" :disabled="Number(selectedSession?.remaining_spots || 0) < 2" type="checkbox" class="w-4 h-4 accent-orange-500">
+                  <span class="text-[14px] font-semibold text-gray-600">團體報名</span>
+                  <span v-if="Number(selectedSession?.remaining_spots || 0) < 2" class="text-[12px] text-gray-400">剩餘名額不足</span>
+                </label>
+              </div>
+
+              <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
+                <div class="flex items-center justify-between gap-4">
+                  <div>
+                    <div class="font-bold">報名人數</div>
+                    <div class="text-[13px] text-muted mt-1">包含本人，共 {{ bookingForm.partySize }} 位</div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <button @click="adjustPartySize(-1)" :disabled="bookingForm.partySize <= 2" type="button" class="w-10 h-10 min-h-0 rounded-xl bg-white border border-line font-bold text-[20px] disabled:opacity-35">−</button>
+                    <div class="w-8 text-center text-[20px] font-bold">{{ bookingForm.partySize }}</div>
+                    <button @click="adjustPartySize(1)" :disabled="bookingForm.partySize >= Number(selectedSession?.remaining_spots || 1)" type="button" class="w-10 h-10 min-h-0 rounded-xl bg-white border border-line font-bold text-[20px] disabled:opacity-35">＋</button>
+                  </div>
+                </div>
+                <div class="mt-3 text-[13px] text-brand-700 font-semibold">
+                  {{ bookingForm.nickname }} + 同行 {{ bookingForm.partySize - 1 }} 位
+                </div>
+              </div>
+
+              <button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名') }}</button>
             </div>
           </div>
         </Transition>
@@ -984,7 +1018,7 @@
               <div class="text-[13px] text-muted mt-2">手機是歷史紀錄的主要識別。之後用相同手機註冊，套票與財務會自動保留。</div>
             </div>
 
-            <button @click="createGuestPlayer" :disabled="guestPlayerLoading" class="mt-5 w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ guestPlayerLoading ? '建立中…' : '建立球友並設定帳務' }}</button>
+            <button @click="createGuestPlayer" :disabled="guestPlayerLoading" class="mt-5 w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ guestPlayerLoading ? '建立中…' : '建立球友' }}</button>
           </div>
         </Transition>
       </div>
@@ -1143,8 +1177,16 @@
           <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float">
             <div class="flex justify-between items-center"><h2 class="text-[23px] font-bold">調整待確認紀錄</h2><button @click="showFinanceEdit = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
             <div class="mt-5 flex flex-col gap-4">
-              <div><label class="font-bold block mb-2">金額</label><input v-model.number="financeEditForm.amount" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
-              <div><label class="font-bold block mb-2">套票增減</label><input v-model.number="financeEditForm.packageDelta" type="number" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+              <div>
+                <label class="font-bold block mb-2">付款方式</label>
+                <div class="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
+                  <button @click="financeEditForm.method = 'cash'" type="button" class="h-11 min-h-0 rounded-lg font-bold text-[15px]" :class="financeEditForm.method === 'cash' ? 'bg-white shadow-sm text-ink' : 'text-muted'">現金／轉帳</button>
+                  <button @click="financeEditForm.method = 'package'" type="button" class="h-11 min-h-0 rounded-lg font-bold text-[15px]" :class="financeEditForm.method === 'package' ? 'bg-white shadow-sm text-ink' : 'text-muted'">套票</button>
+                </div>
+                <div class="text-[13px] text-muted mt-2">同一筆報名只能選一種付款方式，不能混搭。</div>
+              </div>
+              <div v-if="financeEditForm.method === 'cash'"><label class="font-bold block mb-2">金額</label><input v-model.number="financeEditForm.amount" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+              <div v-else><label class="font-bold block mb-2">套票扣除</label><input v-model.number="financeEditForm.packageUnits" type="number" min="1" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               <div><label class="font-bold block mb-2">備註</label><input v-model.trim="financeEditForm.note" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               <button @click="saveFinanceEdit" :disabled="adminActionLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">儲存待確認內容</button>
             </div>
@@ -1265,7 +1307,7 @@
       const showBooking = ref(false);
       const bookingLoading = ref(false);
       const bookingError = ref('');
-      const bookingForm = ref({ mode: 'self', nickname: '', phone: '' });
+      const bookingForm = ref({ mode: 'self', nickname: '', phone: '', group: false, partySize: 2 });
 
       const recordsMode = ref('bookings');
       const recordsLoading = ref(false);
@@ -1345,7 +1387,7 @@
 
       const showFinanceEdit = ref(false);
       const financeEditTarget = ref(null);
-      const financeEditForm = ref({ amount: 0, packageDelta: 0, note: '' });
+      const financeEditForm = ref({ method: 'cash', amount: 0, packageUnits: 1, note: '' });
 
       const showCreateSession = ref(false);
       const sessionPhotoFile = ref(null);
@@ -1362,6 +1404,33 @@
       const filteredPublicSessions = computed(() => {
         return [...publicSessions.value].sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
       });
+
+      const expandedPublicRoster = computed(() => {
+        const rows = [];
+        for (const row of publicRoster.value) {
+          const size = Math.max(1, Number(row.party_size || 1));
+          rows.push({
+            ...row,
+            displayKey: `${row.booking_id}-0`,
+            displayName: row.nickname,
+            companion: false
+          });
+          for (let i = 1; i < size; i += 1) {
+            rows.push({
+              ...row,
+              displayKey: `${row.booking_id}-${i}`,
+              displayName: `同行 ${i}`,
+              dupr_rating: null,
+              companion: true
+            });
+          }
+        }
+        return rows;
+      });
+
+      const adminRosterParticipantCount = computed(() =>
+        adminRoster.value.reduce((sum, row) => sum + Math.max(1, Number(row.party_size || 1)), 0)
+      );
 
       const canBookSelectedSession = computed(() => {
         const s = selectedSession.value;
@@ -1383,7 +1452,12 @@
           [/Session end time must be after start time/i, '結束時間必須晚於開始時間'],
           [/Venue is required/i, '請填寫場地'],
           [/Capacity must be greater than zero/i, '人數上限必須大於 0'],
-          [/Capacity cannot be lower than the current active booking count/i, '人數上限不能少於目前已報名人數'],
+          [/Capacity cannot be lower than the current active booking count|Capacity cannot be lower than the current active participant count/i, '人數上限不能少於目前已報名人數'],
+          [/Not enough remaining spots for this party size/i, '剩餘名額不足，請減少團體報名人數'],
+          [/Party size must be at least 1/i, '報名人數至少需要 1 位'],
+          [/Group booking is only available for self booking/i, '團體報名僅限本人報名使用'],
+          [/Booking payment must use either cash or package units, not both/i, '付款與套票只能選擇一種，不能混搭'],
+          [/Booking package payment cannot add package units/i, '場次付款只能扣除套票，不能增加套票'],
           [/Default price cannot be negative/i, '單次費用不能小於 0'],
           [/Default package units cannot be negative/i, '套票扣次不能小於 0'],
           [/Price and package units cannot be changed after bookings exist/i, '已有報名後不能修改費用或套票扣次'],
@@ -2077,10 +2151,17 @@
         if (error) { showToast(`匯出失敗：${friendlyError(error)}`); return; }
         const rows = data || [];
         const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-        const header = ['時間','球友','套票餘額','金額','套票次數','狀態','審核','備註'];
+        const header = ['時間','球友','報名人數','套票餘額','金額','套票次數','狀態','審核','備註'];
         const body = rows.map(r => [
-          formatDateTime(r.date_at), r.player, r.package_balance ?? '', r.amount ?? 0,
-          r.package_units ?? 0, r.status, r.operator ?? '', r.note ?? ''
+          formatDateTime(r.date_at),
+          r.player,
+          Number(r.party_size || 1),
+          r.package_balance ?? '',
+          r.amount ?? 0,
+          r.package_units ?? 0,
+          r.status,
+          r.operator ?? '',
+          r.note ?? ''
         ].map(esc).join(','));
         const csv = '\uFEFF' + [header.map(esc).join(','), ...body].join('\n');
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -2231,6 +2312,8 @@
 
       function setBookingMode(mode) {
         bookingForm.value.mode = mode;
+        bookingForm.value.group = false;
+        bookingForm.value.partySize = 2;
         if (mode === 'self') {
           bookingForm.value.nickname = profile.value?.nickname || '';
           bookingForm.value.phone = profile.value?.phone || '';
@@ -2240,16 +2323,41 @@
         }
       }
 
+      function toggleGroupBooking() {
+        if (!bookingForm.value.group) {
+          bookingForm.value.partySize = 2;
+          return;
+        }
+        const remaining = Math.max(1, Number(selectedSession.value?.remaining_spots || 1));
+        if (remaining < 2) {
+          bookingForm.value.group = false;
+          bookingForm.value.partySize = 2;
+          bookingError.value = '剩餘名額不足，無法使用團體報名';
+          return;
+        }
+        bookingForm.value.partySize = 2;
+      }
+
+      function adjustPartySize(delta) {
+        const remaining = Math.max(1, Number(selectedSession.value?.remaining_spots || 1));
+        const next = Number(bookingForm.value.partySize || 2) + Number(delta || 0);
+        bookingForm.value.partySize = Math.min(remaining, Math.max(2, next));
+      }
+
       async function submitBooking() {
         bookingError.value = '';
         bookingLoading.value = true;
         try {
           if (!bookingForm.value.nickname) throw new Error('請輸入參加者暱稱');
           const phone = normalizePhone(bookingForm.value.phone);
+          const partySize = bookingForm.value.mode === 'self' && bookingForm.value.group
+            ? Math.max(2, Number(bookingForm.value.partySize || 2))
+            : 1;
           const { error } = await sb.rpc('create_booking_for_phone', {
             p_session_id: selectedSession.value.id,
             p_phone: phone,
-            p_nickname: bookingForm.value.nickname
+            p_nickname: bookingForm.value.nickname,
+            p_party_size: partySize
           });
           if (error) throw error;
           showBooking.value = false;
@@ -2576,17 +2684,28 @@
 
       async function openFinanceEdit(row) {
         financeEditTarget.value = { ...row, entryId: row.financial_entry_id };
-        financeEditForm.value = { amount: Number(row.amount || 0), packageDelta: Number(row.package_delta || 0), note: row.financial_note || '' };
+        const packageDelta = Number(row.package_delta || 0);
+        financeEditForm.value = {
+          method: packageDelta < 0 ? 'package' : 'cash',
+          amount: Number(row.amount || 0),
+          packageUnits: Math.max(1, Math.abs(packageDelta || Number(row.party_size || 1))),
+          note: row.financial_note || ''
+        };
         showFinanceEdit.value = true;
       }
 
       async function saveFinanceEdit() {
+        const method = financeEditForm.value.method;
+        const amount = method === 'cash' ? Math.max(0, Number(financeEditForm.value.amount || 0)) : 0;
+        const packageUnits = Math.max(1, Number(financeEditForm.value.packageUnits || 1));
+        const packageDelta = method === 'package' ? -packageUnits : 0;
+
         adminActionLoading.value = true;
         try {
           const { error } = await sb.rpc('update_pending_financial_entry', {
             p_entry_id: financeEditTarget.value.entryId,
-            p_amount: Number(financeEditForm.value.amount || 0),
-            p_package_delta: Number(financeEditForm.value.packageDelta || 0),
+            p_amount: amount,
+            p_package_delta: packageDelta,
             p_note: financeEditForm.value.note || null
           });
           if (error) throw error;
@@ -2601,7 +2720,7 @@
         if (!adminSelectedSession.value) return;
         const confirmed = Number(adminSelectedSession.value.confirmed_count || 0);
         const warning = confirmed > 0
-          ? `本場已有 ${confirmed} 筆已確認收款。取消整場後，原收款／扣次會保留；退款或補回套票需另做人工調整。\n\n請輸入取消原因（按取消可中止）：`
+          ? `本場已有 ${confirmed} 人已確認收款。取消整場後，原收款／扣次會保留；退款或補回套票需另做人工調整。\n\n請輸入取消原因（按取消可中止）：`
           : '取消整場後，所有待確認報名會一起取消。\n\n請輸入取消原因（按取消可中止）：';
         const note = window.prompt(warning, '');
         if (note === null) return;
@@ -2864,7 +2983,7 @@
 
       return {
         booting, user, profile, activeTab, subView, toast,
-        publicSessions, publicSessionsHasMore, sessionsLoading, filteredPublicSessions, SESSION_PLACEHOLDER_IMAGE,
+        publicSessions, publicSessionsHasMore, sessionsLoading, filteredPublicSessions, expandedPublicRoster, SESSION_PLACEHOLDER_IMAGE,
         selectedSession, publicRoster, rosterLoading, canBookSelectedSession,
         showAuth, authMode, authLoading, authError, authForm, showPassword,
         showBooking, bookingLoading, bookingError, bookingForm,
@@ -2873,7 +2992,7 @@
         showProfile, profileLoading, profileError, profileForm, ownPhoneEdit, ownPhoneLoading, ownPhoneError, ownPhoneForm,
         ownPasswordEdit, ownPasswordLoading, ownPasswordError, ownPasswordForm,
         showSubstitute, substituteLoading, substituteForm, substituteContext,
-        adminMode, adminSessions, adminSessionsHasMore, adminSelectedSession, adminRoster, adminRosterLoading,
+        adminMode, adminSessions, adminSessionsHasMore, adminSelectedSession, adminRoster, adminRosterLoading, adminRosterParticipantCount,
         adminActionLoading, adminFinance, adminFinanceHasMore, financeFilter,
         adminPlayers, adminPlayersLoading, adminPlayersHasMore, adminPlayerSearch,
         showAdminPlayer, adminPlayerTarget, adminPlayerHistory, adminPlayerHistoryLoading, adminPlayerHistoryHasMore,
@@ -2888,7 +3007,7 @@
         sessionProgress, sessionStatusText, sessionStatusClass, sessionDbStatusText,
         showToast, loadPublicSessions, loadMorePublicSessions, viewSession, closeSubView, goTab,
         openAuth, switchAuthMode, submitAuth, logout,
-        startBooking, setBookingMode, submitBooking,
+        startBooking, setBookingMode, toggleGroupBooking, adjustPartySize, submitBooking,
         loadMyData, loadMoreBookings, loadMoreFinance,
         cancelMyBooking, openSubstitute, openAdminSubstitute, submitSubstitute, cancelAdminBooking,
         openProfile, saveProfile, toggleOwnPhoneEdit, changeOwnPhone, toggleOwnPasswordEdit, changeOwnPassword,
