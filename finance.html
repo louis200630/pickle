@@ -49,7 +49,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
 .sheetbar{position:sticky;top:0;background:#fff;z-index:2;padding:19px 0 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ebf1ed}
 .sheetbar button{background:#edf6ef;border:0;border-radius:50%;width:35px;height:35px;font-size:21px;color:var(--dark)}
 .bottom{position:fixed;z-index:30;bottom:0;left:0;right:0;margin:auto;max-width:650px;background:#fffefafa;border-top:1px solid #d5e6d9;display:flex;justify-content:space-around;padding:9px 6px max(12px,env(safe-area-inset-bottom))}
-.bottom button{border:0;background:transparent;color:#8a9a90;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;padding:4px 18px;font-weight:700}
+.bottom button{border:0;background:transparent;color:#8a9a90;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;padding:4px 8px;font-weight:700;flex:1;min-width:0}
 .bottom button.on{color:var(--primary)}.bottom .symbol{font-size:22px;line-height:1.2}
 .spinner{border:3px solid #d0e8d8;border-top-color:var(--primary);border-radius:50%;height:24px;width:24px;animation:spin 1s linear infinite;margin:20px auto}@keyframes spin{to{transform:rotate(360deg)}}
 @media(min-width:601px){.modalback{align-items:center}.sheet{border-radius:24px;max-height:85dvh}.content{padding:22px 25px}.top{padding:28px 27px}}
@@ -77,7 +77,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
   </div>
 
   <main v-else class="content">
-    <div class="row between"><span class="muted">{{updatedAt?'最近讀取：'+updatedAt:'讀取財務資料'}}</span><button class="btn secondary" style="min-height:35px;padding:8px 11px;font-size:12px" :disabled="working" @click="load">↻ 重新整理</button></div>
+    <div class="row between"><span class="muted">{{updatedAt?'最近讀取：'+updatedAt:'讀取財務資料'}}</span><button class="btn secondary" style="min-height:35px;padding:8px 11px;font-size:12px" :disabled="working" @click="tab==='independent'?loadIndependent():load()">↻ 重新整理</button></div>
     <div v-if="error" class="error">{{error}}</div>
     <div v-if="loading" class="center"><div class="spinner"></div>從 Google Sheets 取得財務資料…</div>
     <template v-else>
@@ -107,13 +107,36 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
         </button></div>
         <div v-if="!filtered.length" class="center">目前沒有符合條件的場次。</div>
       </div>
-      <a class="sheetlink" href="https://docs.google.com/spreadsheets/d/16Id5n1FJi9Xc3rRIYPAHRMZ1bJW8H-F3S7QlZGeyp2k/edit" target="_blank" rel="noopener">開啟完整 Google 財務總表 <span>↗</span></a>
+      <div v-if="tab==='independent'">
+        <div class="section-head"><h2>獨立收款紀錄</h2><button class="btn" style="min-height:38px;padding:8px 14px;font-size:12px" @click="newIndependent">＋ 新增紀錄</button></div>
+        <div class="notice">這裡只記錄日期、項目、金額與備註。即使是混合匯款，也只記下實際金流；<b>不會自動加進場次營收、分潤或套票次數</b>。</div>
+        <div v-if="independentError" class="error">{{independentError}}<div class="muted" style="margin-top:7px">若尚未更新 Apps Script，請先部署「財務中心 v4」。</div></div>
+        <div v-if="independentLoading" class="center"><div class="spinner"></div>讀取獨立收款紀錄…</div>
+        <template v-else>
+          <div v-if="!independentItems.length" class="center">目前沒有獨立收款紀錄，點「新增紀錄」開始記帳。</div>
+          <div class="card" v-for="m in independentItems" :key="'memo'+m.row">
+            <button v-if="m.editable" class="cardbtn" @click="editIndependent(m)">
+              <div class="cardtop"><div><div class="date">{{m.date}}</div><div class="venue">{{m.item}}</div></div><span class="pill">{{m.origin==='legacy'?'既有紀錄':'手動紀錄'}}</span></div>
+              <div class="row between" style="margin-top:10px"><b style="color:var(--dark);font-size:20px">{{money(m.amount)}}</b><span class="muted">編輯 ↗</span></div>
+              <p v-if="m.notes" class="muted" style="margin-top:9px;white-space:pre-wrap;overflow-wrap:anywhere">{{m.notes}}</p>
+            </button>
+            <div v-else style="padding:16px">
+              <div class="cardtop"><div><div class="date">{{m.date}}</div><div class="venue">{{m.item}}</div></div><span class="pill gray">系統同步・唯讀</span></div>
+              <b style="display:block;color:var(--dark);margin-top:10px">{{money(m.amount)}}</b>
+              <p v-if="m.notes" class="muted" style="margin-top:9px;white-space:pre-wrap">{{m.notes}}</p>
+            </div>
+          </div>
+        </template>
+        <a class="sheetlink" target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/16Id5n1FJi9Xc3rRIYPAHRMZ1bJW8H-F3S7QlZGeyp2k/edit?gid=1841676098">開啟獨立收款 Google Sheets <span>↗</span></a>
+      </div>
+      <a v-if="tab!=='independent'" class="sheetlink" href="https://docs.google.com/spreadsheets/d/16Id5n1FJi9Xc3rRIYPAHRMZ1bJW8H-F3S7QlZGeyp2k/edit" target="_blank" rel="noopener">開啟完整 Google 財務總表 <span>↗</span></a>
     </template>
   </main>
   <nav v-if="loggedIn" class="bottom" aria-label="財務導覽">
     <button :class="{on:tab==='overview'}" @click="tab='overview'"><span class="symbol">▦</span>總覽</button>
     <button :class="{on:tab==='sessions'}" @click="tab='sessions'"><span class="symbol">▤</span>場次</button>
     <button :class="{on:tab==='transfers'}" @click="tab='transfers'"><span class="symbol">⇄</span>匯款</button>
+    <button :class="{on:tab==='independent'}" @click="tab='independent';loadIndependent()"><span class="symbol">▣</span>收款紀錄</button>
   </nav>
 
   <div v-if="editing" class="modalback" @click.self="editing=null">
@@ -151,6 +174,20 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
       </form>
     </section>
   </div>
+  <div v-if="independentEditing" class="modalback" @click.self="independentEditing=false">
+    <section class="sheet" role="dialog" aria-modal="true" aria-label="新增或編輯獨立收款">
+      <div class="sheetbar"><div><b>{{memoOriginal?'編輯獨立紀錄':'新增獨立紀錄'}}</b><div class="muted">只記錄原始金流，不影響場次結算</div></div><button aria-label="關閉" @click="independentEditing=false">×</button></div>
+      <form @submit.prevent="saveIndependent">
+        <div class="field"><label for="memo-date">日期</label><input id="memo-date" type="date" v-model="memoDraft.date" required></div>
+        <div class="field"><label for="memo-item">項目／用途</label><input id="memo-item" v-model.trim="memoDraft.item" maxlength="150" placeholder="例如：10/21 團主代收款、套票匯款" required></div>
+        <div class="field"><label for="memo-amount">實際收款／匯款金額（NT$）</label><input id="memo-amount" type="number" min="0" max="10000000" step="1" v-model="memoDraft.amount" placeholder="0" required></div>
+        <div class="field"><label for="memo-notes">備註（選填）</label><textarea id="memo-notes" v-model="memoDraft.notes" maxlength="1000" placeholder="例如：4940 季票＋900 球友代收；多收 60 已由團主退還"></textarea></div>
+        <div class="notice">這筆只存到「獨立收款紀錄」，不自動計入場次收入，也不會增加團主待匯款。已有套票同步交易請勿再新增重複收入。</div>
+        <div class="error" v-if="independentError">{{independentError}}</div>
+        <button class="btn" style="width:100%;margin:5px 0 20px" :disabled="working || !independentCanSave">{{working?'儲存中…':'儲存到 Google Sheets'}}</button>
+      </form>
+    </section>
+  </div>
 </div>
 <script>
 (function(){
@@ -167,10 +204,16 @@ setup(){
 const booting=ref(true),loggedIn=ref(false),loading=ref(false),working=ref(false),error=ref('');
 const phone=ref(''),password=ref(''),tab=ref('overview'),filter=ref('all'),items=ref([]),updatedAt=ref('');
 const editing=ref(null),draft=ref({}),original=ref({});
+ const independentItems=ref([]),independentLoading=ref(false),independentError=ref(''),independentEditing=ref(false);
+ const memoDraft=ref({date:'',item:'',amount:'',notes:''}),memoOriginal=ref(null);
 const money=v=>'NT$'+fmt.format(Number(v||0));
 const filtered=computed(()=>items.value.filter(s=>tab.value==='transfers'?(s.status==='settled'&&s.due>0):filter.value==='all'?true:filter.value==='settled'?s.status==='settled':s.status!=='settled'));
 const totals=computed(()=>items.value.filter(s=>s.status==='settled').reduce((a,s)=>{a.due+=Number(s.due||0);a.profit+=Number(s.profit||0);a.paid+=Number(s.paid_organizer||0);a.revenue+=Number(s.system_income||0)+Number(s.manual_income||0);return a;},{due:0,profit:0,paid:0,revenue:0}));
 const hasChanges=computed(()=>KEYS.some(k=>String(draft.value[k]??'')!==String(original.value[k]??'')));
+ const independentCanSave=computed(()=>!!memoDraft.value.date && !!String(memoDraft.value.item||'').trim() &&
+  memoDraft.value.amount!=='' && Number.isSafeInteger(Number(memoDraft.value.amount)) && Number(memoDraft.value.amount)>=0 &&
+  Number(memoDraft.value.amount)<=10000000 &&
+  (!memoOriginal.value || ['date','item','amount','notes'].some(k=>String(memoDraft.value[k]??'')!==String(memoOriginal.value[k]??''))));
 async function invoke(body){
   const {data,error:callError}=await client.functions.invoke('finance-sheet',{body});
   if(callError){let message=callError.message||'後端連線失敗';try{const payload=await callError.context?.json();if(payload?.error)message=payload.error;}catch(_){}
@@ -187,7 +230,41 @@ async function load(){
     updatedAt.value=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
   }catch(e){error.value=e.message;}finally{loading.value=false;}
 }
-async function login(){
+async function loadIndependent(){
+   if(!loggedIn.value)return;
+   independentLoading.value=true;independentError.value='';
+   try{
+     const data=await invoke({action:'independent_read'});
+     independentItems.value=(data.items||[]).sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.row-a.row);
+   }catch(e){independentError.value=e.message||'獨立收款讀取失敗';}finally{independentLoading.value=false;}
+ }
+ const localToday=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ function newIndependent(){
+   independentError.value='';
+   memoOriginal.value=null;memoDraft.value={date:localToday(),item:'',amount:'',notes:''};independentEditing.value=true;
+ }
+ function editIndependent(m){
+   if(!m.editable)return;
+   independentError.value='';
+   memoOriginal.value={...m};
+   memoDraft.value={date:m.date,item:m.item,amount:String(m.amount),notes:m.notes||''};
+   independentEditing.value=true;
+ }
+ async function saveIndependent(){
+   if(!independentCanSave.value)return;
+   const record={id:memoOriginal.value?.origin==='manual'?memoOriginal.value.id:'memo:'+crypto.randomUUID(),
+     date:memoDraft.value.date,item:String(memoDraft.value.item||'').trim(),
+     amount:Number(memoDraft.value.amount),notes:String(memoDraft.value.notes||'')};
+   const body={action:'independent_save',record};
+   if(memoOriginal.value?.origin==='legacy'){
+     body.legacy_row=memoOriginal.value.row;
+     body.original={date:memoOriginal.value.date,item:memoOriginal.value.item,amount:memoOriginal.value.amount,notes:memoOriginal.value.notes||''};
+   }
+   working.value=true;independentError.value='';
+   try{await invoke(body);independentEditing.value=false;await loadIndependent();}
+   catch(e){independentError.value=e.message||'獨立收款儲存失敗';}finally{working.value=false;}
+ }
+ async function login(){
   error.value='';working.value=true;
   try{const email=parsePhone(phone.value)+'@pickle.example.com';
     const {error:authError}=await client.auth.signInWithPassword({email,password:password.value});
@@ -195,7 +272,7 @@ async function login(){
     if(error.value.includes('權限')){await client.auth.signOut();loggedIn.value=false;}
   }catch(e){error.value=e.message||'登入失敗';}finally{working.value=false;}
 }
-async function logout(){await client.auth.signOut();loggedIn.value=false;items.value=[];error.value='';editing.value=null;}
+async function logout(){await client.auth.signOut();loggedIn.value=false;items.value=[];independentItems.value=[];error.value='';independentError.value='';editing.value=null;independentEditing.value=false;}
 function open(s){editing.value={...s};draft.value=Object.fromEntries(KEYS.map(k=>[k,s[k]??(k==='notes'?'':0)]));original.value={...draft.value};error.value='';}
 async function save(){
   if(!editing.value||!hasChanges.value)return;
@@ -209,7 +286,7 @@ onMounted(async()=>{
   catch(e){error.value='請重新登入';}
   booting.value=false;if(loggedIn.value)await load();
 });
-return {booting,loggedIn,loading,working,error,phone,password,tab,filter,items,updatedAt,editing,draft,original,filtered,totals,money,hasChanges,load,login,logout,open,save};
+return {booting,loggedIn,loading,working,error,phone,password,tab,filter,items,updatedAt,editing,draft,original,filtered,totals,money,hasChanges,load,login,logout,open,save,independentItems,independentLoading,independentError,independentEditing,memoDraft,memoOriginal,independentCanSave,loadIndependent,newIndependent,editIndependent,saveIndependent};
 }
 }).mount('#finance-app');
 })();
