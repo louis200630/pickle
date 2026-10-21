@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#166534">
+<title>財務管理｜匹克球球敘</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+:root{--primary:#166534;--dark:#064e3b;--mid:#047857;--pale:#f0fdf4;--mint:#dcfce7;--border:#dfece3;--bg:#f6faf7;--ink:#22332a;--muted:#68786e;--shadow:0 8px 28px rgba(22,101,52,.08)}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);font-family:"Noto Sans TC",system-ui,sans-serif;color:var(--ink);-webkit-tap-highlight-color:transparent}
+button,input,textarea,select{font:inherit}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
+[v-cloak]{display:none}.app{max-width:650px;margin:0 auto;min-height:100dvh;background:#fff;box-shadow:0 2px 26px rgba(0,0,0,.07);padding-bottom:100px}
+.top{background:linear-gradient(145deg,#14532d,#166534 55%,#047857);color:white;padding:max(env(safe-area-inset-top),23px) 21px 24px;border-radius:0 0 27px 27px}
+.kicker{font-size:12px;opacity:.81;letter-spacing:.12em}.topbar{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:6px}
+h1{font-size:24px;line-height:1.3;margin:0;font-weight:800}h2{font-size:17px;margin:0;font-weight:800}p{margin:0;line-height:1.6}
+button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;padding:8px 11px;color:#fff;font-size:12px}
+.content{padding:18px 17px 28px}.muted{font-size:12px;color:var(--muted)}.white-muted{font-size:12px;color:#e2f9e9}.section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:17px 1px 12px}
+.pill{padding:4px 10px;border-radius:50px;font-size:11px;font-weight:700;background:#e5f8ea;color:var(--primary);white-space:nowrap}
+.pill.warn{background:#fff4db;color:#966000}.pill.gray{background:#edf2ee;color:#617166}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.kpi{padding:16px;border:1px solid var(--border);background:#fff;border-radius:18px;box-shadow:var(--shadow)}.kpi.accent{background:var(--pale)}
+.kpi .label{font-size:12px;color:var(--muted);font-weight:600}.kpi .amount{font-size:22px;font-weight:800;letter-spacing:-.035em;margin-top:8px;color:var(--dark);overflow-wrap:anywhere}.kpi .hint{font-size:11px;color:var(--muted);margin-top:4px}
+.card{border:1px solid var(--border);border-radius:19px;background:#fff;box-shadow:var(--shadow);margin-top:10px;overflow:hidden}
+.cardbtn{display:block;width:100%;background:none;border:0;text-align:left;padding:16px}.cardbtn:focus-visible,.btn:focus-visible{outline:3px solid #34d399;outline-offset:2px}
+.cardtop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.date{color:var(--muted);font-size:12px;font-weight:600}.venue{font-size:15px;font-weight:800;margin-top:3px}
+.metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;border-top:1px solid #e9f1eb;margin-top:14px;padding-top:12px}
+.metrics small{font-size:10px;color:var(--muted);display:block}.metrics b{font-size:14px;color:var(--dark);margin-top:4px;display:block}
+.btn{border:none;border-radius:13px;padding:12px 15px;min-height:45px;background:var(--primary);color:white;font-weight:800}
+.btn.secondary{background:#e6f5eb;color:var(--primary)}.btn.outline{border:1px solid #bbdac5;background:#fff;color:var(--primary)}
+.row{display:flex;gap:8px;align-items:center}.row.between{justify-content:space-between}.grow{flex:1}
+.filters{display:flex;gap:7px;overflow:auto;padding:1px 0 7px}.filters button{padding:8px 15px;border:1px solid var(--border);border-radius:40px;background:#fff;color:var(--muted);font-size:12px;font-weight:800;white-space:nowrap}
+.filters button.on{background:#dcfce7;color:var(--primary);border-color:#bbf7d0}
+.center{text-align:center;padding:35px 15px;color:var(--muted);font-size:13px}
+.sheetlink{display:flex;align-items:center;justify-content:space-between;margin-top:15px;border:1px dashed #a8d3b5;border-radius:13px;padding:14px;color:var(--primary);font-weight:700;text-decoration:none;font-size:13px}
+.notice{border-radius:13px;background:#f0fdf4;border:1px solid #cae8d5;color:#266a41;font-size:12px;line-height:1.7;padding:12px 14px;margin:12px 0}
+.notice.warning{background:#fff9e8;border-color:#f1e1af;color:#805713}.error{border:1px solid #fecaca;background:#fff6f6;color:#991b1b;border-radius:13px;padding:13px;font-size:13px;line-height:1.6;margin-top:10px}
+.auth{padding:32px 20px}.auth h2{margin-bottom:9px;font-size:21px}.field{margin:13px 0}.field label{display:block;color:#526b5c;font-size:12px;font-weight:800;margin-bottom:7px}
+.field input,.field textarea{width:100%;background:#fbfefa;border:1px solid #cfdfd3;border-radius:12px;padding:12px 13px;min-height:46px;outline:none;color:var(--ink)}
+.field input:focus,.field textarea:focus{border-color:#0f9a6f;box-shadow:0 0 0 3px #b6ecd3}
+.field input[type=number]{font-variant-numeric:tabular-nums}.field textarea{min-height:88px;resize:vertical}
+.formgroup{border-radius:17px;background:#f7fbf8;border:1px solid var(--border);padding:12px 14px;margin:13px 0}
+.formgroup h3{font-size:14px;margin:0 0 4px;color:var(--dark)}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.bigsum{background:#e9f9ef;border-radius:16px;padding:16px;margin:15px 0}.bigsum span{display:block;color:var(--muted);font-size:12px}.bigsum b{display:block;color:var(--dark);font-size:28px;margin-top:3px}
+.modalback{position:fixed;inset:0;z-index:45;background:#123525a1;display:flex;justify-content:center;align-items:end}
+.sheet{background:#fff;border-radius:25px 25px 0 0;width:min(100%,650px);max-height:94dvh;overflow-y:auto;padding:0 17px max(20px,env(safe-area-inset-bottom));box-shadow:0 4px 22px #0b231733}
+.sheetbar{position:sticky;top:0;background:#fff;z-index:2;padding:19px 0 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ebf1ed}
+.sheetbar button{background:#edf6ef;border:0;border-radius:50%;width:35px;height:35px;font-size:21px;color:var(--dark)}
+.bottom{position:fixed;z-index:30;bottom:0;left:0;right:0;margin:auto;max-width:650px;background:#fffefafa;border-top:1px solid #d5e6d9;display:flex;justify-content:space-around;padding:9px 6px max(12px,env(safe-area-inset-bottom))}
+.bottom button{border:0;background:transparent;color:#8a9a90;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11px;padding:4px 18px;font-weight:700}
+.bottom button.on{color:var(--primary)}.bottom .symbol{font-size:22px;line-height:1.2}
+.spinner{border:3px solid #d0e8d8;border-top-color:var(--primary);border-radius:50%;height:24px;width:24px;animation:spin 1s linear infinite;margin:20px auto}@keyframes spin{to{transform:rotate(360deg)}}
+@media(min-width:601px){.modalback{align-items:center}.sheet{border-radius:24px;max-height:85dvh}.content{padding:22px 25px}.top{padding:28px 27px}}
+</style>
+</head>
+<body>
+<div id="finance-app" v-cloak class="app">
+  <header class="top">
+    <div class="kicker">PICKLE STARS · FINANCE</div>
+    <div class="topbar"><h1>球敘財務中心</h1><button v-if="loggedIn" class="ghost" @click="logout">登出</button></div>
+    <div class="white-muted" style="margin-top:8px">場次營收・成本・分潤・匯款對帳</div>
+  </header>
+
+  <div v-if="booting" class="center"><div class="spinner"></div>正在確認管理員身分…</div>
+  <div v-else-if="!loggedIn" class="auth">
+    <h2>管理員登入</h2>
+    <p class="muted">使用你在匹克球預約系統的手機號碼與密碼；非管理員無法查看財務資料。</p>
+    <form @submit.prevent="login">
+      <div class="field"><label>手機號碼</label><input type="tel" v-model.trim="phone" placeholder="09xxxxxxxx" autocomplete="username" required></div>
+      <div class="field"><label>密碼</label><input type="password" v-model="password" placeholder="輸入登入密碼" autocomplete="current-password" required></div>
+      <button class="btn" style="width:100%" :disabled="working">{{working?'登入中…':'登入並查看財務'}}</button>
+    </form>
+    <div class="error" v-if="error">{{error}}</div>
+    <a class="sheetlink" href="/" style="margin-top:19px">返回預約系統 <span>↗</span></a>
+  </div>
+
+  <main v-else class="content">
+    <div class="row between"><span class="muted">{{updatedAt?'最近讀取：'+updatedAt:'讀取財務資料'}}</span><button class="btn secondary" style="min-height:35px;padding:8px 11px;font-size:12px" :disabled="working" @click="load">↻ 重新整理</button></div>
+    <div v-if="error" class="error">{{error}}</div>
+    <div v-if="loading" class="center"><div class="spinner"></div>從 Google Sheets 取得財務資料…</div>
+    <template v-else>
+      <div v-if="tab==='overview'">
+        <div class="section-head"><h2>財務總覽</h2><span class="pill">Google Sheets 同步</span></div>
+        <div class="grid">
+          <div class="kpi accent"><div class="label">已結算待匯團主</div><div class="amount">{{money(totals.due)}}</div><div class="hint">未完成結算不列入</div></div>
+          <div class="kpi"><div class="label">已結算場次盈餘</div><div class="amount">{{money(totals.profit)}}</div><div class="hint">不含暫估場次</div></div>
+          <div class="kpi"><div class="label">已匯團主</div><div class="amount">{{money(totals.paid)}}</div><div class="hint">已登記匯出款項</div></div>
+          <div class="kpi"><div class="label">已結算活動收入</div><div class="amount">{{money(totals.revenue)}}</div><div class="hint">含已使用套票認列</div></div>
+        </div>
+        <div class="section-head"><h2>最近場次</h2><button class="btn secondary" style="font-size:12px;min-height:35px;padding:7px 12px" @click="tab='sessions'">查看全部</button></div>
+        <div v-if="!items.length" class="center">還沒有場次帳務資料。</div>
+        <div class="card" v-for="s in items.slice(0,4)" :key="'o'+s.row"><button class="cardbtn" @click="open(s)">
+          <div class="cardtop"><div><div class="date">{{s.date}}</div><div class="venue">{{s.venue}}</div></div><span class="pill" :class="{warn:s.status!=='settled'}">{{s.status==='settled'?'已結算':'暫估／未結算'}}</span></div>
+          <div class="metrics"><div><small>活動收入</small><b>{{money(s.system_income+s.manual_income)}}</b></div><div><small>盈餘</small><b>{{money(s.profit)}}</b></div><div><small>尚待匯</small><b>{{money(s.due)}}</b></div></div>
+        </button></div>
+        <div class="notice">場次「尚待匯」依 Google Sheets 公式顯示，只有正式結算後才視為應付款。套票購買總額不會再次加入場次收入。</div>
+      </div>
+      <div v-if="tab==='sessions' || tab==='transfers'">
+        <div class="section-head"><h2>{{tab==='sessions'?'場次帳務':'團主匯款對帳'}}</h2><span class="pill">{{filtered.length}} 場</span></div>
+        <div class="filters" v-if="tab==='sessions'"><button :class="{on:filter==='all'}" @click="filter='all'">全部</button><button :class="{on:filter==='settled'}" @click="filter='settled'">已結算</button><button :class="{on:filter==='open'}" @click="filter='open'">未結算</button></div>
+        <div class="notice" v-if="tab==='transfers'">只要打開場次，填入「本次已匯團主」（累計匯款額），儲存後待匯金額會由試算表自動重新計算。</div>
+        <div class="card" v-for="s in filtered" :key="s.row"><button class="cardbtn" @click="open(s)">
+          <div class="cardtop"><div><div class="date">{{s.date}}</div><div class="venue">{{s.venue}}</div></div><span class="pill" :class="{warn:s.status!=='settled'}">{{s.status==='settled'?'已結算':'暫估／未結算'}}</span></div>
+          <div class="metrics"><div><small>系統收入</small><b>{{money(s.system_income)}}</b></div><div><small>場次盈餘</small><b>{{money(s.profit)}}</b></div><div><small>待匯團主</small><b>{{money(s.due)}}</b></div></div>
+        </button></div>
+        <div v-if="!filtered.length" class="center">目前沒有符合條件的場次。</div>
+      </div>
+      <a class="sheetlink" href="https://docs.google.com/spreadsheets/d/16Id5n1FJi9Xc3rRIYPAHRMZ1bJW8H-F3S7QlZGeyp2k/edit" target="_blank" rel="noopener">開啟完整 Google 財務總表 <span>↗</span></a>
+    </template>
+  </main>
+  <nav v-if="loggedIn" class="bottom" aria-label="財務導覽">
+    <button :class="{on:tab==='overview'}" @click="tab='overview'"><span class="symbol">▦</span>總覽</button>
+    <button :class="{on:tab==='sessions'}" @click="tab='sessions'"><span class="symbol">▤</span>場次</button>
+    <button :class="{on:tab==='transfers'}" @click="tab='transfers'"><span class="symbol">⇄</span>匯款</button>
+  </nav>
+
+  <div v-if="editing" class="modalback" @click.self="editing=null">
+    <section class="sheet" role="dialog" aria-modal="true" aria-label="編輯財務">
+      <div class="sheetbar"><div><b>{{editing.date}}｜{{editing.venue}}</b><div class="muted">{{editing.status==='settled'?'已結算':'未結算・目前為暫估'}}</div></div><button aria-label="關閉" @click="editing=null">×</button></div>
+      <div class="bigsum"><span>尚需匯團主（Google Sheets 計算）</span><b>{{money(editing.due)}}</b></div>
+      <div class="row between" style="padding:0 1px 5px"><span class="muted">系統自動收入</span><b>{{money(editing.system_income)}}</b></div>
+      <div v-if="editing.status!=='settled'" class="notice warning">此場尚未正式結算，現在的收入與盈餘只是暫估，請不要直接把待匯金額當成已結清款。</div>
+      <form @submit.prevent="save">
+        <div class="formgroup"><h3>本場收入與成本</h3><p class="muted">手動欄位更新後，Google Sheets 會重算盈餘。</p>
+          <div class="formgrid">
+            <div class="field"><label>特殊收入調整（可負數）</label><input type="number" step="1" v-model="draft.manual_income"></div>
+            <div class="field"><label>場地租金</label><input type="number" min="0" step="1" v-model="draft.venue_cost"></div>
+            <div class="field"><label>其他支出</label><input type="number" min="0" step="1" v-model="draft.extra_cost"></div>
+          </div>
+          <div class="field"><label>場次備註</label><textarea v-model="draft.notes" maxlength="500" placeholder="例如：特殊活動、退款補登"></textarea></div>
+        </div>
+        <div class="formgroup"><h3>與團主的結算</h3><p class="muted">只記錄你自己的帳，套票已經預付的款項不用重複登記。</p>
+          <div class="formgrid">
+            <div class="field"><label>團主代墊（如場租）</label><input type="number" min="0" step="1" v-model="draft.organizer_advance"><button type="button" class="btn secondary" style="width:100%;min-height:31px;padding:5px;margin-top:5px;font-size:11px" @click="draft.organizer_advance=draft.venue_cost">帶入場租</button></div>
+            <div class="field"><label>累計已匯給團主</label><input type="number" min="0" step="1" v-model="draft.paid_organizer"></div>
+            <div class="field"><label>團主已持有的本場收入</label><input type="number" min="0" step="1" v-model="draft.organizer_holds"></div>
+            <div class="field"><label>團主本場球費抵扣</label><input type="number" min="0" step="1" v-model="draft.organizer_fee_offset"></div>
+          </div>
+        </div>
+        <details class="formgroup"><summary style="cursor:pointer;font-size:14px;font-weight:800;color:var(--dark)">其他核對欄位（需要時再填）</summary>
+          <div class="formgrid">
+            <div class="field"><label>我的本場球費</label><input type="number" min="0" step="1" v-model="draft.personal_fee"></div>
+            <div class="field"><label>我已繳／套票核銷</label><input type="number" min="0" step="1" v-model="draft.personal_prepaid"></div>
+            <div class="field"><label>我實際代收現金</label><input type="number" min="0" step="1" v-model="draft.cash_collected"></div>
+          </div><div class="muted">已買的季票每次使用，可在「我的本場球費」與「我已繳／套票核銷」分別記 380，不會再次要求付款。</div>
+        </details>
+        <div v-if="error" class="error">{{error}}</div>
+        <button class="btn" style="width:100%;margin:5px 0 20px" :disabled="working || !hasChanges">{{working?'儲存中…':'儲存到 Google Sheets'}}</button>
+      </form>
+    </section>
+  </div>
+</div>
+<script>
+(function(){
+'use strict';
+const SUPABASE_URL='https://bpaxiozotebbkycwjsup.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_XYOLSLzLlIjiRcKZOSJnZQ_3nHIeHTg';
+const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const KEYS=['manual_income','venue_cost','extra_cost','notes','organizer_advance','paid_organizer','personal_fee','personal_prepaid','organizer_holds','organizer_fee_offset','cash_collected'];
+const fmt=new Intl.NumberFormat('zh-TW',{maximumFractionDigits:0});
+function parsePhone(raw){let d=String(raw||'').replace(/\D/g,'');if(d.startsWith('886'))d=(d.slice(3).startsWith('0')?'':'0')+d.slice(3);else if(d.length===9&&d.startsWith('9'))d='0'+d;if(!/^09\d{8}$/.test(d))throw Error('請輸入有效的台灣手機號碼');return d;}
+const {createApp,ref,computed,onMounted}=Vue;
+createApp({
+setup(){
+const booting=ref(true),loggedIn=ref(false),loading=ref(false),working=ref(false),error=ref('');
+const phone=ref(''),password=ref(''),tab=ref('overview'),filter=ref('all'),items=ref([]),updatedAt=ref('');
+const editing=ref(null),draft=ref({}),original=ref({});
+const money=v=>'NT$'+fmt.format(Number(v||0));
+const filtered=computed(()=>items.value.filter(s=>tab.value==='transfers'?(s.status==='settled'&&s.due>0):filter.value==='all'?true:filter.value==='settled'?s.status==='settled':s.status!=='settled'));
+const totals=computed(()=>items.value.filter(s=>s.status==='settled').reduce((a,s)=>{a.due+=Number(s.due||0);a.profit+=Number(s.profit||0);a.paid+=Number(s.paid_organizer||0);a.revenue+=Number(s.system_income||0)+Number(s.manual_income||0);return a;},{due:0,profit:0,paid:0,revenue:0}));
+const hasChanges=computed(()=>KEYS.some(k=>String(draft.value[k]??'')!==String(original.value[k]??'')));
+async function invoke(body){
+  const {data,error:callError}=await client.functions.invoke('finance-sheet',{body});
+  if(callError){let message=callError.message||'後端連線失敗';try{const payload=await callError.context?.json();if(payload?.error)message=payload.error;}catch(_){}
+    throw Error(message);}
+  if(!data?.ok)throw Error(data?.error||'財務資料操作失敗');
+  return data;
+}
+async function load(){
+  if(!loggedIn.value)return;
+  loading.value=true;error.value='';
+  try{
+    const data=await invoke({action:'read'});
+    items.value=(data.items||[]).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    updatedAt.value=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){error.value=e.message;}finally{loading.value=false;}
+}
+async function login(){
+  error.value='';working.value=true;
+  try{const email=parsePhone(phone.value)+'@pickle.example.com';
+    const {error:authError}=await client.auth.signInWithPassword({email,password:password.value});
+    if(authError)throw authError;loggedIn.value=true;password.value='';await load();
+    if(error.value.includes('權限')){await client.auth.signOut();loggedIn.value=false;}
+  }catch(e){error.value=e.message||'登入失敗';}finally{working.value=false;}
+}
+async function logout(){await client.auth.signOut();loggedIn.value=false;items.value=[];error.value='';editing.value=null;}
+function open(s){editing.value={...s};draft.value=Object.fromEntries(KEYS.map(k=>[k,s[k]??(k==='notes'?'':0)]));original.value={...draft.value};error.value='';}
+async function save(){
+  if(!editing.value||!hasChanges.value)return;
+  const fields={};for(const k of KEYS){if(String(draft.value[k]??'')!==String(original.value[k]??''))fields[k]=draft.value[k];}
+  working.value=true;error.value='';
+  try{await invoke({action:'save',session_id:editing.value.session_id,fields});editing.value=null;await load();}
+  catch(e){error.value=e.message;}finally{working.value=false;}
+}
+onMounted(async()=>{
+  try{const {data:{session}}=await client.auth.getSession();loggedIn.value=!!session?.user;}
+  catch(e){error.value='請重新登入';}
+  booting.value=false;if(loggedIn.value)await load();
+});
+return {booting,loggedIn,loading,working,error,phone,password,tab,filter,items,updatedAt,editing,draft,original,filtered,totals,money,hasChanges,load,login,logout,open,save};
+}
+}).mount('#finance-app');
+})();
+</script>
+</body>
+</html>
