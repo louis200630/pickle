@@ -2837,7 +2837,7 @@
 
       function applySessionTimeDefaults() {
         if (!sessionForm.value.start) return;
-        sessionForm.value.end = shiftLocalDateTimeInput(sessionForm.value.start, 3);
+        sessionForm.value.end = shiftLocalDateTimeInput(sessionForm.value.start, 2);
         sessionForm.value.registrationDeadline = shiftLocalDateTimeInput(sessionForm.value.start, -1);
       }
 
