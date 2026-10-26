@@ -66,7 +66,7 @@
   </style>
 </head>
 <body>
-<div id="app" v-cloak class="min-h-screen flex justify-center">
+<div id="app" v-cloak class="min-h-screen flex justify-center"><div style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:99999;background:#1f2937;color:white;border-radius:16px;padding:10px 16px;display:flex;gap:12px;align-items:center;white-space:nowrap;font-size:13px"><span>樣式預覽</span><button @click="showProfile=false;openAuth('register')" style="color:#fdba74">註冊</button><button @click="showAuth=false;showProfile=true" style="color:#fdba74">個人資訊</button></div>
   <div class="w-full max-w-[480px] min-h-screen bg-white relative shadow-2xl overflow-hidden isolate">
 
     <!-- Global loading -->
@@ -828,6 +828,7 @@
                   <span>{{ authError }}</span>
                 </div>
 
+<div v-if="authMode === 'register'" class="rounded-2xl border border-line bg-gray-50/70 p-4"><label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="authForm.remittanceEnabled" class="w-5 h-5 accent-orange-500"><span class="font-bold text-[15px]">設定我的匯款後五碼</span></label><div v-if="authForm.remittanceEnabled" class="mt-4"><label for="authForm-last-five" class="block text-[14px] font-semibold mb-2">匯款帳號後五碼</label><input id="authForm-last-five" v-model="authForm.remittanceLastFive" @input="authForm.remittanceLastFive = $event.target.value.replace(/[^0-9]/g, '').slice(0, 5)" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="例如：00123" class="w-full h-[54px] rounded-xl border border-line bg-white px-4 tracking-widest outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-50"><p class="text-[13px] text-muted mt-2 mb-0 leading-5">填寫您常用匯款帳號的後五碼，方便主辦方核對款項。</p></div></div>
                 <button @click="submitAuth" :disabled="authLoading" class="w-full h-[54px] min-h-0 rounded-2xl bg-brand-500 text-white font-bold text-[17px] shadow-[0_8px_22px_rgba(249,115,22,.22)] hover:bg-brand-600 active:scale-[.99] disabled:opacity-50 disabled:shadow-none transition">
                   {{ authLoading ? '處理中…' : (authMode === 'login' ? '登入' : '建立帳號') }}
                 </button>
@@ -931,6 +932,7 @@
                 <label class="font-bold block mb-2">DUPR 分數</label>
                 <input v-model="profileForm.duprRating" type="number" inputmode="decimal" step="0.001" min="2" max="8" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="如果您有DUPR分數請填入此欄位">
               </div>
+<div  class="rounded-2xl border border-line bg-gray-50/70 p-4"><label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="profileForm.remittanceEnabled" class="w-5 h-5 accent-orange-500"><span class="font-bold text-[15px]">設定我的匯款後五碼</span></label><div v-if="profileForm.remittanceEnabled" class="mt-4"><label for="profileForm-last-five" class="block text-[14px] font-semibold mb-2">匯款帳號後五碼</label><input id="profileForm-last-five" v-model="profileForm.remittanceLastFive" @input="profileForm.remittanceLastFive = $event.target.value.replace(/[^0-9]/g, '').slice(0, 5)" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="例如：00123" class="w-full h-[54px] rounded-xl border border-line bg-white px-4 tracking-widest outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-50"><p class="text-[13px] text-muted mt-2 mb-0 leading-5">填寫您常用匯款帳號的後五碼，方便主辦方核對款項。</p></div></div>
               <button @click="saveProfile" :disabled="profileLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ profileLoading ? '儲存中…' : '儲存資料' }}</button>
               <button @click="logout" class="w-full rounded-xl border border-red-200 text-red-600 bg-white font-bold py-3">登出</button>
             </div>
@@ -1356,7 +1358,7 @@
       const authMode = ref('login');
       const authLoading = ref(false);
       const authError = ref('');
-      const authForm = ref({ phone: '', nickname: '', password: '' });
+      const authForm = ref({ phone: '', nickname: '', password: '', remittanceEnabled: false, remittanceLastFive: '' });
       const showPassword = ref(false);
 
       const showBooking = ref(false);
@@ -1377,7 +1379,7 @@
       const showProfile = ref(false);
       const profileLoading = ref(false);
       const profileError = ref('');
-      const profileForm = ref({ nickname: '', duprRating: '' });
+      const profileForm = ref({ nickname: '', duprRating: '', remittanceEnabled: false, remittanceLastFive: '' });
       const ownPhoneEdit = ref(false);
       const ownPhoneLoading = ref(false);
       const ownPhoneError = ref('');
@@ -2266,7 +2268,7 @@
       function openAuth(mode = 'login') {
         authMode.value = mode;
         authError.value = '';
-        authForm.value = { phone: '', nickname: '', password: '' };
+        authForm.value = { phone: '', nickname: '', password: '', remittanceEnabled: false, remittanceLastFive: '' };
         showPassword.value = false;
         showAuth.value = true;
       }
@@ -2296,6 +2298,10 @@
       }
 
       async function submitAuth() {
+authError.value = '';
+if (authForm.value.remittanceEnabled && !/^[0-9]{5}$/.test(authForm.value.remittanceLastFive)) { authError.value = '請輸入完整的 5 位數字'; return; }
+showToast('樣式預覽完成，尚未送出或儲存資料'); return;
+
         authError.value = '';
         authLoading.value = true;
         try {
@@ -2512,7 +2518,7 @@
         ownPasswordForm.value = { current: '', password: '', confirm: '' };
         profileForm.value = {
           nickname: profile.value.nickname || '',
-          duprRating: profile.value.dupr_rating ?? ''
+          duprRating: profile.value.dupr_rating ?? '', remittanceEnabled: false, remittanceLastFive: ''
         };
         showProfile.value = true;
       }
@@ -2627,6 +2633,10 @@
       }
 
       async function saveProfile() {
+profileError.value = '';
+if (profileForm.value.remittanceEnabled && !/^[0-9]{5}$/.test(profileForm.value.remittanceLastFive)) { profileError.value = '請輸入完整的 5 位數字'; return; }
+showToast('樣式預覽完成，尚未送出或儲存資料'); return;
+
         profileError.value = '';
         profileLoading.value = true;
         try {
@@ -3029,6 +3039,8 @@
       }
 
       onMounted(async () => {
+booting.value = false; openAuth('register'); return;
+
         await Promise.all([refreshAuthState(), loadPublicSessions()]);
         if (user.value && profile.value) {
           await loadMyData(true);
@@ -3087,3 +3099,4 @@
 </script>
 </body>
 </html>
+
