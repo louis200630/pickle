@@ -321,7 +321,14 @@
                 <div v-else-if="!row.financial_entry_id" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text border border-solid border-[#e5e5e5] text-muted">未保留待確認財務紀錄</div>
 
                 <div v-if="adminSelectedSession.status === 'open' && row.booking_status === 'active'" class="mt-3">
-<button @click="openBeginnerEdit(row)" class="mt-3 w-full rounded-xl border border-brand-100 bg-brand-50 text-brand-700 font-bold py-2.5">編輯新手資料<span class="ml-2 text-[13px]">目前 {{ row.beginner_count || 0 }} 位</span></button>
+<div class="mt-3 text-[14px] text-gray-600">
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <label class="inline-flex items-center gap-2 cursor-pointer select-none"><input type="checkbox" :checked="row.beginnerDraft ?? row.is_beginner" @change="row.beginnerDraft = $event.target.checked; row.beginnerSaveError = ''" :disabled="row.beginnerSaving" class="w-4 h-4 accent-orange-500"><span>新手</span></label>
+    <label v-if="Number(row.party_size || 1) > 1" class="inline-flex items-center gap-2"><span>同行新手</span><input :value="row.companionBeginnerDraft ?? row.companion_beginner_count ?? 0" @input="row.companionBeginnerDraft = $event.target.value; row.beginnerSaveError = ''" :disabled="row.beginnerSaving" type="number" min="0" :max="Number(row.party_size) - 1" step="1" class="w-16 h-8 rounded-lg border border-line px-2 text-[13px] bg-white" :aria-label="'同行新手人數（不含本人）'"><span class="text-[13px]">位</span></label>
+    <button v-if="beginnerRowChanged(row)" @click="saveInlineBeginners(row)" :disabled="row.beginnerSaving" class="min-h-0 h-8 px-3 rounded-lg border border-line bg-white text-[13px] font-semibold text-gray-600 disabled:opacity-50">{{ row.beginnerSaving ? '儲存中…' : '儲存' }}</button>
+  </div>
+  <div v-if="row.beginnerSaveError" role="alert" class="text-[13px] text-red-600 mt-2">{{ row.beginnerSaveError }}</div>
+</div>
                   <div class="flex gap-2">
                     <button v-if="row.financial_status === 'pending'" @click="confirmFinance(row)" class="flex-1 rounded-xl bg-brand-500 text-white font-bold py-2.5">確認收款</button>
                     <button v-if="row.financial_status === 'pending'" @click="openFinanceEdit(row)" class="rounded-xl border border-line bg-white px-4 font-bold text-gray-700">調整</button>
@@ -507,8 +514,14 @@
                     <div class="flex justify-between mt-2"><span class="text-muted">場次狀態</span><span class="font-semibold">{{ sessionDbStatusText(row.session_status) }}</span></div>
                   </div>
 
-                  <div class="mt-3 text-[13px] text-muted">新手 {{ row.beginner_count || 0 }} 位</div>
-<div v-if="row.booking_status === 'active' && row.session_status === 'open'"><button @click="openBeginnerEdit(row)" class="mt-3 w-full rounded-xl border border-brand-100 bg-brand-50 text-brand-700 font-bold py-2.5">編輯新手資料<span class="ml-2 text-[13px]">目前 {{ row.beginner_count || 0 }} 位</span></button></div>
+<div v-if="row.booking_status === 'active' && row.session_status === 'open'"><div class="mt-3 text-[14px] text-gray-600">
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <label class="inline-flex items-center gap-2 cursor-pointer select-none"><input type="checkbox" :checked="row.beginnerDraft ?? row.is_beginner" @change="row.beginnerDraft = $event.target.checked; row.beginnerSaveError = ''" :disabled="row.beginnerSaving" class="w-4 h-4 accent-orange-500"><span>新手</span></label>
+    <label v-if="Number(row.party_size || 1) > 1" class="inline-flex items-center gap-2"><span>同行新手</span><input :value="row.companionBeginnerDraft ?? row.companion_beginner_count ?? 0" @input="row.companionBeginnerDraft = $event.target.value; row.beginnerSaveError = ''" :disabled="row.beginnerSaving" type="number" min="0" :max="Number(row.party_size) - 1" step="1" class="w-16 h-8 rounded-lg border border-line px-2 text-[13px] bg-white" :aria-label="'同行新手人數（不含本人）'"><span class="text-[13px]">位</span></label>
+    <button v-if="beginnerRowChanged(row)" @click="saveInlineBeginners(row)" :disabled="row.beginnerSaving" class="min-h-0 h-8 px-3 rounded-lg border border-line bg-white text-[13px] font-semibold text-gray-600 disabled:opacity-50">{{ row.beginnerSaving ? '儲存中…' : '儲存' }}</button>
+  </div>
+  <div v-if="row.beginnerSaveError" role="alert" class="text-[13px] text-red-600 mt-2">{{ row.beginnerSaveError }}</div>
+</div></div>
 <div v-if="row.can_manage" class="mt-3 flex gap-2">
                     <button @click="openSubstitute(row)" class="flex-1 rounded-xl border border-line font-bold py-2.5">更換參加者</button>
                     <button @click="cancelMyBooking(row)" class="flex-1 rounded-xl border border-red-200 text-red-600 font-bold py-2.5">取消報名</button>
@@ -905,13 +918,6 @@
       </div>
     </Transition>
 
-    <!-- BEGINNER EDIT -->
-<Transition name="fade"><div v-if="showBeginnerEdit" class="absolute inset-0 z-50 bg-black/40 flex items-end" @click.self="!beginnerEditLoading && (showBeginnerEdit = false)"><div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom max-h-[90vh] overflow-y-auto">
-<div class="flex justify-between items-center mb-5"><h2 class="text-[24px] font-bold">編輯新手資料</h2><button @click="showBeginnerEdit = false" :disabled="beginnerEditLoading" aria-label="關閉" class="w-11 h-11 rounded-full bg-gray-100">×</button></div>
-<div v-if="beginnerEditError" role="alert" class="mb-4 rounded-xl bg-red-50 text-red-700 p-3">{{ beginnerEditError }}</div>
-<div class="text-[14px] text-gray-600"><label class="inline-flex items-center gap-2 cursor-pointer select-none"><input v-model="beginnerEditForm.isBeginner" type="checkbox" class="w-4 h-4 accent-orange-500"><span>新手</span></label><div v-if="beginnerEditForm.partySize > 1" class="mt-3 flex items-center justify-between gap-3"><label for="beginnerEditForm-companions">同行新手人數（不含本人）</label><input id="beginnerEditForm-companions" v-model.number="beginnerEditForm.companionBeginners" type="number" min="0" :max="beginnerEditForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line px-3"></div></div>
-<button @click="saveBeginnerEdit" :disabled="beginnerEditLoading" class="mt-5 w-full rounded-xl bg-brand-500 text-white font-bold py-3 disabled:opacity-50">{{ beginnerEditLoading ? '儲存中…' : '儲存新手資料' }}</button>
-</div></div></Transition>
 <!-- PROFILE SHEET -->
     <Transition name="fade">
       <div v-if="showProfile" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showProfile = false">
@@ -1414,11 +1420,6 @@
       const substituteTarget = ref(null);
       const substituteContext = ref('player');
       const substituteForm = ref({ nickname: '', phone: '', note: '', isBeginner: false, companionBeginners: 0, partySize: 1 });
-      const showBeginnerEdit = ref(false);
-      const beginnerEditTarget = ref(null);
-      const beginnerEditForm = ref({ isBeginner: false, companionBeginners: 0, partySize: 1 });
-      const beginnerEditLoading = ref(false);
-      const beginnerEditError = ref('');
 
       const adminMode = ref('sessions');
       const adminSessions = ref([]);
@@ -2469,30 +2470,34 @@
         }
       }
 
-      function openBeginnerEdit(row) {
-        beginnerEditTarget.value = row;
-        beginnerEditError.value = '';
-        beginnerEditForm.value = { isBeginner: !!row.is_beginner, companionBeginners: Number(row.companion_beginner_count || 0), partySize: Number(row.party_size || 1) };
-        showBeginnerEdit.value = true;
+      function beginnerRowChanged(row) {
+        return Boolean(row.beginnerDraft ?? row.is_beginner) !== Boolean(row.is_beginner)
+          || Number(row.companionBeginnerDraft ?? row.companion_beginner_count ?? 0) !== Number(row.companion_beginner_count || 0);
       }
-      async function saveBeginnerEdit() {
-        beginnerEditLoading.value = true;
-        beginnerEditError.value = '';
+      async function saveInlineBeginners(row) {
+        if (row.beginnerSaving || !beginnerRowChanged(row)) return;
+        row.beginnerSaving = true;
+        row.beginnerSaveError = '';
+        const isBeginner = Boolean(row.beginnerDraft ?? row.is_beginner);
+        const count = Number(row.companionBeginnerDraft ?? row.companion_beginner_count ?? 0);
         try {
-          const count = Number(beginnerEditForm.value.companionBeginners);
-          if (!Number.isInteger(count) || count < 0 || count >= beginnerEditForm.value.partySize) throw new Error('同行新手人數必須介於 0 與同行人數之間');
+          if (!Number.isInteger(count) || count < 0 || count >= Number(row.party_size || 1)) throw new Error('同行新手人數必須介於 0 與同行人數之間');
           const { error } = await sb.rpc('update_booking_beginners', {
-            p_booking_id: beginnerEditTarget.value.booking_id,
-            p_is_beginner: beginnerEditForm.value.isBeginner,
-            p_companion_beginner_count: count
+            p_booking_id: row.booking_id, p_is_beginner: isBeginner, p_companion_beginner_count: count
           });
           if (error) throw error;
-          await Promise.all([loadMyData(true), loadPublicSessions()]);
-          if (subView.value === 'adminSession') await refreshAdminDetail();
-          showBeginnerEdit.value = false;
-          showToast('新手資料已更新');
-        } catch (e) { beginnerEditError.value = friendlyError(e); }
-        finally { beginnerEditLoading.value = false; }
+          for (const record of [row, ...myBookings.value, ...adminRoster.value]) {
+            if (record.booking_id !== row.booking_id) continue;
+            record.is_beginner = isBeginner;
+            record.companion_beginner_count = count;
+            record.beginner_count = Number(isBeginner) + count;
+            delete record.beginnerDraft;
+            delete record.companionBeginnerDraft;
+          }
+          await loadPublicSessions();
+          showToast('新手資料已儲存');
+        } catch (e) { row.beginnerSaveError = friendlyError(e); }
+        finally { row.beginnerSaving = false; }
       }
 
       async function cancelMyBooking(row) {
@@ -3125,7 +3130,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
         booting, user, profile, activeTab, subView, toast, homeIntroExpanded,
         publicSessions, publicSessionsHasMore, sessionsLoading, filteredPublicSessions, expandedPublicRoster, SESSION_PLACEHOLDER_IMAGE,
         selectedSession, publicRoster, rosterLoading, canBookSelectedSession,
-        showBeginnerEdit, beginnerEditForm, beginnerEditLoading, beginnerEditError, openBeginnerEdit, saveBeginnerEdit,
+        beginnerRowChanged, saveInlineBeginners,
         showAuth, authMode, authLoading, authError, authForm, showPassword,
         showBooking, bookingLoading, bookingError, bookingForm,
         recordsMode, recordsLoading, myBookings, myFinance, packageBalance,
