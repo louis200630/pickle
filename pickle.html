@@ -579,7 +579,10 @@
                   <div>
                     <div class="font-bold text-[16px]">付款與聯絡</div>
                     <p class="text-muted leading-5 mt-0.5 mb-0 text-[13px]">付款後由主辦方人工核對，可接受匯款帳戶、LINE Pay。
-                      <br>(013)國泰世華 帳號：041500171781
+                      <br><button @click="openPaymentQr" :disabled="paymentQrLoading" type="button" class="min-h-0 my-2 inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-[14px] font-semibold text-gray-700 disabled:opacity-50">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h3v3h3v3h-6zM21 12v3M12 3v3M12 12h3M12 18v3"/></svg>
+                        查看收款 QR Code
+                      </button>
                       <br>匯款請告知帳號後五碼，或備註給主辦方，感謝您。
                       <br>聯絡主辦方式：louis200630@gmail.com。</p>
                   </div>
@@ -785,6 +788,30 @@
         </button>
       </div>
     </nav>
+
+    <!-- PAYMENT QR SHEET -->
+    <Transition name="fade">
+      <div v-if="showPaymentQr" class="absolute inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-end" @click.self="closePaymentQr">
+        <div role="dialog" aria-modal="true" aria-labelledby="payment-qr-title" class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float overflow-y-auto app-scroll">
+          <div class="flex items-center justify-between gap-3 mb-4">
+            <h2 id="payment-qr-title" class="text-[22px] font-bold">收款 QR Code</h2>
+            <button @click="closePaymentQr" type="button" aria-label="關閉收款 QR Code" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div v-if="paymentQrLoading" class="py-12 text-center text-muted" role="status">載入收款碼中…</div>
+          <div v-else-if="paymentQrError" role="alert" class="rounded-xl bg-red-50 text-red-700 p-4 text-[14px]">{{ paymentQrError }}</div>
+          <template v-else-if="paymentQrUrl">
+            <img :src="paymentQrUrl" alt="國泰世華銀行收款 QR Code" class="block w-full max-w-[340px] h-auto mx-auto rounded-xl" style="-webkit-touch-callout: default; user-select: auto;" @error="paymentQrError = '收款碼載入失敗，請關閉後再試一次'">
+            <p class="text-[13px] text-muted text-center mt-3">長按圖片可儲存至相簿</p>
+            <div class="mt-4 grid grid-cols-2 gap-3">
+              <a :href="paymentQrUrl" :download="paymentQrFilename" class="min-h-[44px] rounded-xl border border-line bg-white text-gray-700 font-semibold flex items-center justify-center">下載圖片</a>
+              <a :href="paymentQrUrl" target="_blank" rel="noopener noreferrer" class="min-h-[44px] rounded-xl border border-line bg-white text-gray-700 font-semibold flex items-center justify-center">開啟原圖</a>
+            </div>
+          </template>
+        </div>
+      </div>
+    </Transition>
 
     <!-- AUTH SHEET -->
     <Transition name="fade">
@@ -1384,6 +1411,40 @@
       const selectedSession = ref(null);
       const publicRoster = ref([]);
       const rosterLoading = ref(false);
+
+      const showPaymentQr = ref(false);
+      const paymentQrLoading = ref(false);
+      const paymentQrError = ref('');
+      const paymentQrUrl = ref('');
+      const paymentQrFilename = ref('pickle-payment-qr.jpg');
+      let paymentQrRequest = 0;
+      function closePaymentQr() {
+        paymentQrRequest += 1;
+        showPaymentQr.value = false;
+        paymentQrLoading.value = false;
+        paymentQrError.value = '';
+        if (paymentQrUrl.value) URL.revokeObjectURL(paymentQrUrl.value);
+        paymentQrUrl.value = '';
+      }
+      async function openPaymentQr() {
+        closePaymentQr();
+        const request = ++paymentQrRequest;
+        showPaymentQr.value = true;
+        paymentQrLoading.value = true;
+        try {
+          const { data, error } = await sb.rpc('get_payment_qr');
+          if (request !== paymentQrRequest) return;
+          if (error) throw error;
+          if (!data || !['image/jpeg', 'image/png'].includes(data.mime_type) || typeof data.content_base64 !== 'string' || data.content_base64.length > 2000000) throw new Error('收款碼資料無法讀取，請聯絡主辦方');
+          const bytes = Uint8Array.from(atob(data.content_base64), char => char.charCodeAt(0));
+          paymentQrUrl.value = URL.createObjectURL(new Blob([bytes], { type: data.mime_type }));
+          paymentQrFilename.value = data.mime_type === 'image/png' ? 'pickle-payment-qr.png' : 'pickle-payment-qr.jpg';
+        } catch (e) {
+          if (request === paymentQrRequest) paymentQrError.value = friendlyError(e);
+        } finally {
+          if (request === paymentQrRequest) paymentQrLoading.value = false;
+        }
+      }
 
       const showAuth = ref(false);
       const authMode = ref('login');
@@ -2378,6 +2439,7 @@
       }
 
       async function logout() {
+        closePaymentQr();
         await sb.auth.signOut();
         user.value = null;
         profile.value = null;
@@ -3125,7 +3187,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
           }
         }
         sb.auth.onAuthStateChange(async (event, session) => {
-          if (event === 'SIGNED_OUT') return;
+          if (event === 'SIGNED_OUT') { closePaymentQr(); return; }
           user.value = session?.user || null;
         });
         booting.value = false;
@@ -3136,6 +3198,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
         publicSessions, publicSessionsHasMore, sessionsLoading, filteredPublicSessions, expandedPublicRoster, SESSION_PLACEHOLDER_IMAGE,
         selectedSession, publicRoster, rosterLoading, canBookSelectedSession,
         beginnerRowChanged, saveInlineBeginners,
+        showPaymentQr, paymentQrLoading, paymentQrError, paymentQrUrl, paymentQrFilename, openPaymentQr, closePaymentQr,
         showAuth, authMode, authLoading, authError, authForm, showPassword,
         showBooking, bookingLoading, bookingError, bookingForm,
         recordsMode, recordsLoading, myBookings, myFinance, packageBalance,
