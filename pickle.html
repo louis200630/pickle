@@ -153,7 +153,7 @@
               <div class="flex justify-between items-end mb-2">
                 <div>
                   <div class="font-bold">報名進度</div>
-                  <div class="text-[14px] text-muted mt-1 flex flex-wrap items-center gap-x-4 gap-y-1"><span>剩餘 {{ selectedSession.remaining_spots }} 個名額</span><span>新手名額剩 {{ selectedSession.beginner_remaining }} 位</span></div>
+                  <div class="text-[14px] text-muted mt-1 flex flex-wrap items-center gap-x-1 gap-y-1"><span>剩餘 {{ selectedSession.remaining_spots }} 個名額</span><span aria-hidden="true">・</span><span>新手名額剩 {{ selectedSession.beginner_remaining }} 位</span></div>
                 </div>
                 <div class="font-bold text-[17px]">{{ selectedSession.registered_count }} / {{ selectedSession.capacity }}</div>
               </div>
@@ -438,7 +438,7 @@
 
                 <div class="mt-4">
                   <div class="flex justify-between items-start gap-3 data-text mb-2">
-                    <div class="text-muted flex flex-wrap items-center gap-x-3 gap-y-1"><span>{{ session.status === 'open' ? `剩 ${session.remaining_spots} 個名額` : '最終名單' }}</span><span v-if="session.status === 'open'">新手名額剩 {{ session.beginner_remaining }} 位</span></div>
+                    <div class="text-muted flex flex-wrap items-center gap-x-1 gap-y-1"><span>{{ session.status === 'open' ? `剩 ${session.remaining_spots} 個名額` : '最終名單' }}</span><span v-if="session.status === 'open'" aria-hidden="true">・</span><span v-if="session.status === 'open'">新手名額剩 {{ session.beginner_remaining }} 位</span></div>
                     <span class="font-bold shrink-0">{{ session.registered_count }} / {{ session.capacity }}</span>
                   </div>
                   <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -883,11 +883,17 @@
               <div>
                 <label class="font-bold block mb-2">參加者手機</label>
                 <input v-model.trim="bookingForm.phone" :readonly="bookingForm.mode === 'self'" type="tel" inputmode="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50">
-                <label v-if="bookingForm.mode === 'self'" class="mt-3 inline-flex items-center gap-2 cursor-pointer select-none">
-                  <input v-model="bookingForm.group" @change="toggleGroupBooking" :disabled="Number(selectedSession?.remaining_spots || 0) < 2" type="checkbox" class="w-4 h-4 accent-orange-500">
-                  <span class="text-[14px] font-semibold text-gray-600">團體報名</span>
-                  <span v-if="Number(selectedSession?.remaining_spots || 0) < 2" class="text-[12px] text-gray-400">剩餘名額不足</span>
-                </label>
+                <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px] font-semibold text-gray-600" role="group" aria-label="報名設定">
+                  <label v-if="bookingForm.mode === 'self'" class="inline-flex items-center gap-2 cursor-pointer select-none">
+                    <input v-model="bookingForm.group" @change="toggleGroupBooking" :disabled="Number(selectedSession?.remaining_spots || 0) < 2" type="checkbox" class="w-4 h-4 accent-orange-500">
+                    <span>團體報名</span>
+                  </label>
+                  <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+                    <input v-model="bookingForm.isBeginner" type="checkbox" class="w-4 h-4 accent-orange-500">
+                    <span>{{ bookingForm.mode === 'self' ? '我是新手' : '參加者是新手' }}</span>
+                  </label>
+                  <span v-if="bookingForm.mode === 'self' && Number(selectedSession?.remaining_spots || 0) < 2" class="text-[12px] font-normal text-gray-400">剩餘名額不足，無法團體報名</span>
+                </div>
               </div>
 
               <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
@@ -907,9 +913,8 @@
                 </div>
               </div>
 
-              <div class="text-[14px] text-gray-600">
-                <label class="inline-flex items-center gap-2 cursor-pointer select-none"><input v-model="bookingForm.isBeginner" type="checkbox" class="w-4 h-4 accent-orange-500"><span>新手</span></label>
-                <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="mt-3 flex items-center justify-between gap-3"><label for="booking-companions">同行新手人數（不含本人）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line bg-white px-3"></div>
+              <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="text-[14px] text-gray-600">
+                <div class="flex items-center justify-between gap-3"><label for="booking-companions">同行新手人數（不含本人）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line bg-white px-3"></div>
               </div>
               <button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名') }}</button>
             </div>
