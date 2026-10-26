@@ -148,7 +148,7 @@
               <div class="flex justify-between items-end mb-2">
                 <div>
                   <div class="font-bold">報名進度</div>
-                  <div class="text-[14px] text-muted mt-1">剩餘 {{ selectedSession.remaining_spots }} 個名額</div>
+                  <div class="text-[14px] text-muted mt-1">剩餘 {{ selectedSession.remaining_spots }} 個名額</div><div class="text-[13px] text-brand-700 font-semibold mt-2">新手名額剩 {{ selectedSession.beginner_remaining }} 位</div>
                 </div>
                 <div class="font-bold text-[17px]">{{ selectedSession.registered_count }} / {{ selectedSession.capacity }}</div>
               </div>
@@ -316,6 +316,7 @@
                 <div v-else-if="!row.financial_entry_id" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text border border-solid border-[#e5e5e5] text-muted">未保留待確認財務紀錄</div>
 
                 <div v-if="adminSelectedSession.status === 'open' && row.booking_status === 'active'" class="mt-3">
+<button @click="openBeginnerEdit(row)" class="mt-3 w-full rounded-xl border border-brand-100 bg-brand-50 text-brand-700 font-bold py-2.5">編輯新手資料<span class="ml-2 text-[13px]">目前 {{ row.beginner_count || 0 }} 位</span></button>
                   <div class="flex gap-2">
                     <button v-if="row.financial_status === 'pending'" @click="confirmFinance(row)" class="flex-1 rounded-xl bg-brand-500 text-white font-bold py-2.5">確認收款</button>
                     <button v-if="row.financial_status === 'pending'" @click="openFinanceEdit(row)" class="rounded-xl border border-line bg-white px-4 font-bold text-gray-700">調整</button>
@@ -425,7 +426,7 @@
 
                 <div class="mt-4">
                   <div class="flex justify-between items-center data-text mb-2">
-                    <span class="text-muted">{{ session.status === 'open' ? `剩 ${session.remaining_spots} 個名額` : '最終名單' }}</span>
+                    <span class="text-muted">{{ session.status === 'open' ? `剩 ${session.remaining_spots} 個名額` : '最終名單' }}</span><span v-if="session.status === 'open'" class="text-brand-700 text-[13px]">新手名額剩 {{ session.beginner_remaining }} 位</span>
                     <span class="font-bold">{{ session.registered_count }} / {{ session.capacity }}</span>
                   </div>
                   <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -501,7 +502,9 @@
                     <div class="flex justify-between mt-2"><span class="text-muted">場次狀態</span><span class="font-semibold">{{ sessionDbStatusText(row.session_status) }}</span></div>
                   </div>
 
-                  <div v-if="row.can_manage" class="mt-3 flex gap-2">
+                  <div class="mt-3 text-[13px] text-muted">新手 {{ row.beginner_count || 0 }} 位</div>
+<div v-if="row.booking_status === 'active' && row.session_status === 'open'"><button @click="openBeginnerEdit(row)" class="mt-3 w-full rounded-xl border border-brand-100 bg-brand-50 text-brand-700 font-bold py-2.5">編輯新手資料<span class="ml-2 text-[13px]">目前 {{ row.beginner_count || 0 }} 位</span></button></div>
+<div v-if="row.can_manage" class="mt-3 flex gap-2">
                     <button @click="openSubstitute(row)" class="flex-1 rounded-xl border border-line font-bold py-2.5">更換參加者</button>
                     <button @click="cancelMyBooking(row)" class="flex-1 rounded-xl border border-red-200 text-red-600 font-bold py-2.5">取消報名</button>
                   </div>
@@ -886,14 +889,27 @@
                 </div>
               </div>
 
-              <button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名') }}</button>
+              <div class="rounded-2xl border border-brand-100 bg-brand-50/50 p-4">
+<label class="flex items-center gap-3 cursor-pointer"><input v-model="bookingForm.isBeginner" type="checkbox" class="w-5 h-5 accent-orange-500"><span class="font-bold">新手<span class="font-normal text-[13px] text-muted ml-2">本人／代報參加者</span></span></label>
+<div v-if="bookingForm.mode === 'self' && bookingForm.group" class="mt-4"><label for="booking-companions" class="block font-semibold mb-2">同行新手人數（不含本人）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-full h-12 rounded-xl border border-line bg-white px-4"></div>
+<p class="text-[13px] text-muted mt-3 mb-0">新手由參加者自行勾選，不依 DUPR 判定。</p>
+<div class="text-[14px] text-brand-700 font-semibold mt-2">新手合計 {{ Number(bookingForm.isBeginner) + (bookingForm.group ? Number(bookingForm.companionBeginners || 0) : 0) }} 位 · 名額剩 {{ selectedSession?.beginner_remaining }} 位</div></div>
+<button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名') }}</button>
             </div>
           </div>
         </Transition>
       </div>
     </Transition>
 
-    <!-- PROFILE SHEET -->
+    <!-- BEGINNER EDIT -->
+<Transition name="fade"><div v-if="showBeginnerEdit" class="absolute inset-0 z-50 bg-black/40 flex items-end" @click.self="!beginnerEditLoading && (showBeginnerEdit = false)"><div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom max-h-[90vh] overflow-y-auto">
+<div class="flex justify-between items-center mb-5"><h2 class="text-[24px] font-bold">編輯新手資料</h2><button @click="showBeginnerEdit = false" :disabled="beginnerEditLoading" aria-label="關閉" class="w-11 h-11 rounded-full bg-gray-100">×</button></div>
+<p class="text-[14px] text-muted mb-4">取消新手勾選會釋出新手名額；取消整筆報名時會自動釋出全部名額。</p>
+<div v-if="beginnerEditError" role="alert" class="mb-4 rounded-xl bg-red-50 text-red-700 p-3">{{ beginnerEditError }}</div>
+<div class="rounded-2xl border border-line bg-gray-50 p-4"><label class="flex items-center gap-3 cursor-pointer"><input v-model="beginnerEditForm.isBeginner" type="checkbox" class="w-5 h-5 accent-orange-500"><span class="font-bold">新手（參加者本人）</span></label><div v-if="beginnerEditForm.partySize > 1" class="mt-4"><label class="block font-semibold mb-2">同行新手人數（不含本人）</label><input v-model.number="beginnerEditForm.companionBeginners" type="number" min="0" :max="beginnerEditForm.partySize - 1" step="1" class="w-full h-12 rounded-xl border border-line px-4"></div></div>
+<button @click="saveBeginnerEdit" :disabled="beginnerEditLoading" class="mt-5 w-full rounded-xl bg-brand-500 text-white font-bold py-3 disabled:opacity-50">{{ beginnerEditLoading ? '儲存中…' : '儲存新手資料' }}</button>
+</div></div></Transition>
+<!-- PROFILE SHEET -->
     <Transition name="fade">
       <div v-if="showProfile" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showProfile = false">
         <Transition name="sheet" appear>
@@ -951,7 +967,7 @@
               <div><label class="font-bold block mb-2">新參加者暱稱</label><input v-model.trim="substituteForm.nickname" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               <div><label class="font-bold block mb-2">新參加者手機</label><input v-model.trim="substituteForm.phone" type="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               <div><label class="font-bold block mb-2">備註</label><input v-model.trim="substituteForm.note" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="選填"></div>
-              <button @click="submitSubstitute" :disabled="substituteLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ substituteLoading ? '處理中…' : '確認更換' }}</button>
+              <div class="rounded-2xl border border-line bg-gray-50 p-4"><label class="flex items-center gap-3 cursor-pointer"><input v-model="substituteForm.isBeginner" type="checkbox" class="w-5 h-5 accent-orange-500"><span class="font-bold">新手（參加者本人）</span></label><div v-if="substituteForm.partySize > 1" class="mt-4"><label class="block font-semibold mb-2">同行新手人數（不含本人）</label><input v-model.number="substituteForm.companionBeginners" type="number" min="0" :max="substituteForm.partySize - 1" step="1" class="w-full h-12 rounded-xl border border-line px-4"></div></div><button @click="submitSubstitute" :disabled="substituteLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ substituteLoading ? '處理中…' : '確認更換' }}</button>
             </div>
           </div>
         </Transition>
@@ -1290,8 +1306,9 @@
                   </div>
                 </div>
               </div>
-              <div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">類型</label><input v-model.trim="sessionForm.category" class="w-full h-12 rounded-xl border border-line px-4" placeholder="一般場"></div><div><label class="font-bold block mb-2">人數上限</label><input v-model.number="sessionForm.capacity" type="number" min="1" class="w-full h-12 rounded-xl border border-line px-4"></div></div>
-              <div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">單次費用</label><input v-model.number="sessionForm.price" :disabled="sessionForm.lockPricing" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 disabled:bg-gray-100 disabled:text-gray-500"></div><div><label class="font-bold block mb-2">套票扣次</label><input v-model.number="sessionForm.units" :disabled="sessionForm.lockPricing" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 disabled:bg-gray-100 disabled:text-gray-500"></div></div>
+              <div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">類型</label><input v-model.trim="sessionForm.category" class="w-full h-12 rounded-xl border border-line px-4" placeholder="一般場&新手場"></div><div><label class="font-bold block mb-2">人數上限</label><input v-model.number="sessionForm.capacity" type="number" min="1" class="w-full h-12 rounded-xl border border-line px-4"></div></div>
+              <div><label for="session-beginner-capacity" class="font-bold block mb-2">新手名額上限</label><input id="session-beginner-capacity" v-model.number="sessionForm.beginnerCapacity" type="number" min="0" step="1" class="w-full h-12 rounded-xl border border-line px-4"><p class="text-[13px] text-muted mt-2">新手名額包含在總人數內，填 0 表示不開放新手報名。</p></div>
+<div class="grid grid-cols-2 gap-3"><div><label class="font-bold block mb-2">單次費用</label><input v-model.number="sessionForm.price" :disabled="sessionForm.lockPricing" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 disabled:bg-gray-100 disabled:text-gray-500"></div><div><label class="font-bold block mb-2">套票扣次</label><input v-model.number="sessionForm.units" :disabled="sessionForm.lockPricing" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 disabled:bg-gray-100 disabled:text-gray-500"></div></div>
               <div v-if="sessionForm.lockPricing" class="text-[13px] text-muted -mt-2">已有報名紀錄，價格與套票扣次不可直接修改。</div>
               <div>
                 <label class="font-bold block mb-2">報名截止</label>
@@ -1364,7 +1381,7 @@
       const showBooking = ref(false);
       const bookingLoading = ref(false);
       const bookingError = ref('');
-      const bookingForm = ref({ mode: 'self', nickname: '', phone: '', group: false, partySize: 2 });
+      const bookingForm = ref({ mode: 'self', nickname: '', phone: '', group: false, partySize: 2, isBeginner: false, companionBeginners: 0 });
 
       const recordsMode = ref('bookings');
       const recordsLoading = ref(false);
@@ -1393,7 +1410,12 @@
       const substituteLoading = ref(false);
       const substituteTarget = ref(null);
       const substituteContext = ref('player');
-      const substituteForm = ref({ nickname: '', phone: '', note: '' });
+      const substituteForm = ref({ nickname: '', phone: '', note: '', isBeginner: false, companionBeginners: 0, partySize: 1 });
+      const showBeginnerEdit = ref(false);
+      const beginnerEditTarget = ref(null);
+      const beginnerEditForm = ref({ isBeginner: false, companionBeginners: 0, partySize: 1 });
+      const beginnerEditLoading = ref(false);
+      const beginnerEditError = ref('');
 
       const adminMode = ref('sessions');
       const adminSessions = ref([]);
@@ -1453,7 +1475,7 @@
       const settledNoteSaving = ref(false);
       const settledNoteDraft = ref('');
       const sessionForm = ref({
-        id: null, start: '', end: '', venue: '', venueUrl: 'https://maps.app.goo.gl/vpjVaUuDfBKvP3Vi7', category: '一般場', capacity: 8,
+        id: null, start: '', end: '', venue: '', venueUrl: 'https://maps.app.goo.gl/vpjVaUuDfBKvP3Vi7', category: '一般場&新手場', capacity: 8, beginnerCapacity: 8,
         price: 420, units: 1, registrationDeadline: '',
         publicNote: '', internalNote: '', photoPath: '', originalPhotoPath: '', lockPricing: false
       });
@@ -1670,7 +1692,7 @@
       async function loadPublicSessions(reset = true) {
         sessionsLoading.value = true;
         if (reset) publicSessionsOffset.value = 0;
-        const { data, error } = await sb.rpc('list_public_sessions_v2', { p_limit: 30, p_offset: publicSessionsOffset.value, p_status: null });
+        const { data, error } = await sb.rpc('list_public_sessions_with_beginners', { p_limit: 30, p_offset: publicSessionsOffset.value, p_status: null });
         sessionsLoading.value = false;
         if (error) { showToast(`場次載入失敗：${friendlyError(error)}`); return; }
         if (reset) publicSessions.value = data || [];
@@ -1711,7 +1733,7 @@
         }
 
         const [bookingsRes, financeRes, balanceRes] = await Promise.all([
-          sb.rpc('get_my_bookings', { p_limit: 30, p_offset: myBookingsOffset.value }),
+          sb.rpc('get_my_bookings_with_beginners', { p_limit: 30, p_offset: myBookingsOffset.value }),
           sb.rpc('get_my_financial_history', { p_limit: 30, p_offset: myFinanceOffset.value }),
           sb.rpc('get_my_package_balance')
         ]);
@@ -1730,7 +1752,7 @@
 
       async function loadMoreBookings() {
         myBookingsOffset.value += 30;
-        const { data, error } = await sb.rpc('get_my_bookings', { p_limit: 30, p_offset: myBookingsOffset.value });
+        const { data, error } = await sb.rpc('get_my_bookings_with_beginners', { p_limit: 30, p_offset: myBookingsOffset.value });
         if (error) { showToast(friendlyError(error)); return; }
         myBookings.value.push(...(data || []));
         myBookingsHasMore.value = (data || []).length === 30;
@@ -1747,7 +1769,7 @@
       async function loadAdminSessions(reset = true) {
         if (profile.value?.role !== 'admin') return;
         if (reset) adminSessionsOffset.value = 0;
-        const { data, error } = await sb.rpc('list_admin_sessions_v2', { p_limit: 30, p_offset: adminSessionsOffset.value, p_status: null });
+        const { data, error } = await sb.rpc('list_admin_sessions_with_beginners', { p_limit: 30, p_offset: adminSessionsOffset.value, p_status: null });
         if (error) { showToast(`管理場次載入失敗：${friendlyError(error)}`); return; }
         if (reset) adminSessions.value = data || [];
         else adminSessions.value.push(...(data || []));
@@ -2237,7 +2259,7 @@
         publicRoster.value = [];
         subView.value = 'session';
         rosterLoading.value = true;
-        const { data, error } = await sb.rpc('get_public_session_roster', { p_session_id: session.id });
+        const { data, error } = await sb.rpc('get_public_roster_with_beginners', { p_session_id: session.id });
         rosterLoading.value = false;
         if (error) { showToast(`名單載入失敗：${friendlyError(error)}`); return; }
         publicRoster.value = data || [];
@@ -2371,6 +2393,8 @@
 
       function setBookingMode(mode) {
         bookingForm.value.mode = mode;
+        bookingForm.value.isBeginner = false;
+        bookingForm.value.companionBeginners = 0;
         bookingForm.value.group = false;
         bookingForm.value.partySize = 2;
         if (mode === 'self') {
@@ -2383,6 +2407,7 @@
       }
 
       function toggleGroupBooking() {
+        bookingForm.value.companionBeginners = 0;
         if (!bookingForm.value.group) {
           bookingForm.value.partySize = 2;
           return;
@@ -2401,6 +2426,7 @@
         const remaining = Math.max(1, Number(selectedSession.value?.remaining_spots || 1));
         const next = Number(bookingForm.value.partySize || 2) + Number(delta || 0);
         bookingForm.value.partySize = Math.min(remaining, Math.max(2, next));
+        bookingForm.value.companionBeginners = Math.min(Number(bookingForm.value.companionBeginners || 0), bookingForm.value.partySize - 1);
       }
 
       async function submitBooking() {
@@ -2412,11 +2438,16 @@
           const partySize = bookingForm.value.mode === 'self' && bookingForm.value.group
             ? Math.max(2, Number(bookingForm.value.partySize || 2))
             : 1;
-          const { error } = await sb.rpc('create_booking_for_phone', {
+          const companionBeginners = bookingForm.value.group ? Number(bookingForm.value.companionBeginners) : 0;
+          if (!Number.isInteger(companionBeginners) || companionBeginners < 0 || companionBeginners >= partySize) throw new Error('同行新手人數必須介於 0 與同行人數之間');
+          if (Number(bookingForm.value.isBeginner) + companionBeginners > Number(selectedSession.value.beginner_remaining)) throw new Error('新手名額不足，請調整新手人數或選擇其他場次');
+          const { error } = await sb.rpc('create_booking_with_beginners', {
             p_session_id: selectedSession.value.id,
             p_phone: phone,
             p_nickname: bookingForm.value.nickname,
-            p_party_size: partySize
+            p_party_size: partySize,
+            p_is_beginner: bookingForm.value.isBeginner,
+            p_companion_beginner_count: bookingForm.value.group ? Number(bookingForm.value.companionBeginners) : 0
           });
           if (error) throw error;
           showBooking.value = false;
@@ -2424,7 +2455,7 @@
           const refreshed = publicSessions.value.find(s => s.id === selectedSession.value.id);
           if (refreshed) selectedSession.value = refreshed;
           if (subView.value === 'session') {
-            const roster = await sb.rpc('get_public_session_roster', { p_session_id: selectedSession.value.id });
+            const roster = await sb.rpc('get_public_roster_with_beginners', { p_session_id: selectedSession.value.id });
             if (!roster.error) publicRoster.value = roster.data || [];
           }
           showToast(bookingForm.value.mode === 'self' ? '報名成功，等待主辦方確認收款' : '已成功幫朋友報名');
@@ -2433,6 +2464,32 @@
         } finally {
           bookingLoading.value = false;
         }
+      }
+
+      function openBeginnerEdit(row) {
+        beginnerEditTarget.value = row;
+        beginnerEditError.value = '';
+        beginnerEditForm.value = { isBeginner: !!row.is_beginner, companionBeginners: Number(row.companion_beginner_count || 0), partySize: Number(row.party_size || 1) };
+        showBeginnerEdit.value = true;
+      }
+      async function saveBeginnerEdit() {
+        beginnerEditLoading.value = true;
+        beginnerEditError.value = '';
+        try {
+          const count = Number(beginnerEditForm.value.companionBeginners);
+          if (!Number.isInteger(count) || count < 0 || count >= beginnerEditForm.value.partySize) throw new Error('同行新手人數必須介於 0 與同行人數之間');
+          const { error } = await sb.rpc('update_booking_beginners', {
+            p_booking_id: beginnerEditTarget.value.booking_id,
+            p_is_beginner: beginnerEditForm.value.isBeginner,
+            p_companion_beginner_count: count
+          });
+          if (error) throw error;
+          await Promise.all([loadMyData(true), loadPublicSessions()]);
+          if (subView.value === 'adminSession') await refreshAdminDetail();
+          showBeginnerEdit.value = false;
+          showToast('新手資料已更新');
+        } catch (e) { beginnerEditError.value = friendlyError(e); }
+        finally { beginnerEditLoading.value = false; }
       }
 
       async function cancelMyBooking(row) {
@@ -2446,27 +2503,31 @@
       function openSubstitute(row) {
         substituteContext.value = 'player';
         substituteTarget.value = row;
-        substituteForm.value = { nickname: '', phone: '', note: '' };
+        substituteForm.value = { nickname: '', phone: '', note: '', isBeginner: false, companionBeginners: Number(row.companion_beginner_count || 0), partySize: Number(row.party_size || 1) };
         showSubstitute.value = true;
       }
 
       function openAdminSubstitute(row) {
         substituteContext.value = 'admin';
         substituteTarget.value = row;
-        substituteForm.value = { nickname: '', phone: '', note: '' };
+        substituteForm.value = { nickname: '', phone: '', note: '', isBeginner: false, companionBeginners: Number(row.companion_beginner_count || 0), partySize: Number(row.party_size || 1) };
         showSubstitute.value = true;
       }
 
       async function submitSubstitute() {
         substituteLoading.value = true;
         try {
+          const count = Number(substituteForm.value.companionBeginners);
+          if (!Number.isInteger(count) || count < 0 || count >= substituteForm.value.partySize) throw new Error('同行新手人數必須介於 0 與同行人數之間');
           const phone = normalizePhone(substituteForm.value.phone);
           if (!substituteForm.value.nickname) throw new Error('請輸入新參加者暱稱');
-          const { error } = await sb.rpc('change_booking_participant', {
+          const { error } = await sb.rpc('change_participant_with_beginners', {
             p_booking_id: substituteTarget.value.booking_id,
             p_phone: phone,
             p_nickname: substituteForm.value.nickname,
-            p_note: substituteForm.value.note || null
+            p_note: substituteForm.value.note || null,
+            p_is_beginner: substituteForm.value.isBeginner,
+            p_companion_beginner_count: Number(substituteForm.value.companionBeginners)
           });
           if (error) throw error;
           showSubstitute.value = false;
@@ -2674,7 +2735,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
         settledNoteDraft.value = session.internal_note || '';
         subView.value = 'adminSession';
         adminRosterLoading.value = true;
-        const { data, error } = await sb.rpc('get_admin_session_roster', { p_session_id: session.session_id });
+        const { data, error } = await sb.rpc('get_admin_roster_with_beginners', { p_session_id: session.session_id });
         adminRosterLoading.value = false;
         if (error) { showToast(friendlyError(error)); return; }
         adminRoster.value = data || [];
@@ -2688,7 +2749,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
           adminSelectedSession.value = updated;
           if (!settledNoteEditing.value) settledNoteDraft.value = updated.internal_note || '';
         }
-        const { data, error } = await sb.rpc('get_admin_session_roster', { p_session_id: adminSelectedSession.value.session_id });
+        const { data, error } = await sb.rpc('get_admin_roster_with_beginners', { p_session_id: adminSelectedSession.value.session_id });
         if (!error) adminRoster.value = data || [];
       }
 
@@ -2857,8 +2918,9 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
           end: shiftLocalDateTimeInput(defaultStart, 2),
           venue: 'Pickle Fever (泰山館)',
           venueUrl: 'https://maps.app.goo.gl/vpjVaUuDfBKvP3Vi7',
-          category: '一般場',
+          category: '一般場&新手場',
           capacity: 20,
+          beginnerCapacity: 8,
           price: 420,
           units: 1,
           registrationDeadline: shiftLocalDateTimeInput(defaultStart, -1),
@@ -2888,8 +2950,9 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
           end: toTaipeiInput(session.end_at),
           venue: session.venue || '',
           venueUrl: session.venue_url || '',
-          category: session.category || '一般場',
+          category: session.category || '一般場&新手場',
           capacity: Number(session.capacity || 8),
+          beginnerCapacity: Number(session.beginner_capacity ?? 8),
           price: Number(session.default_price || 0),
           units: Number(session.default_package_units || 0),
           registrationDeadline: toTaipeiInput(session.registration_deadline),
@@ -2943,6 +3006,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
         adminActionLoading.value = true;
         try {
           if (!sessionForm.value.start || !sessionForm.value.end || !sessionForm.value.venue) throw new Error('開始、結束時間與場地為必填');
+          if (!Number.isInteger(Number(sessionForm.value.beginnerCapacity)) || Number(sessionForm.value.beginnerCapacity) < 0) throw new Error('新手名額上限必須為 0 或正整數');
           const startAt = new Date(sessionForm.value.start);
           const endAt = new Date(sessionForm.value.end);
           if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()) || endAt <= startAt) throw new Error('結束時間必須晚於開始時間');
@@ -2953,8 +3017,9 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
             end: endAt.toISOString(),
             venue: sessionForm.value.venue,
             venueUrl: sessionForm.value.venueUrl?.trim() || null,
-            category: sessionForm.value.category || '一般場',
+            category: sessionForm.value.category || '一般場&新手場',
             capacity: Number(sessionForm.value.capacity || 8),
+            beginnerCapacity: Number(sessionForm.value.beginnerCapacity),
             price: Number(sessionForm.value.price || 0),
             units: Number(sessionForm.value.units || 0),
             registrationDeadline: toIsoOrNull(sessionForm.value.registrationDeadline),
@@ -2977,7 +3042,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
             }
 
             if (editedId) {
-              const { error } = await sb.rpc('update_session_details_v3', {
+              const { error } = await sb.rpc('update_session_with_beginners', {
                 p_session_id: editedId,
                 p_start_at: values.start,
                 p_end_at: values.end,
@@ -2985,6 +3050,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
                 p_venue_url: values.venueUrl,
                 p_category: values.category,
                 p_capacity: values.capacity,
+                p_beginner_capacity: values.beginnerCapacity,
                 p_default_price: values.price,
                 p_default_package_units: values.units,
                 p_registration_deadline: values.registrationDeadline,
@@ -3002,6 +3068,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
                 venue_url: values.venueUrl,
                 category: values.category,
                 capacity: values.capacity,
+                beginner_capacity: values.beginnerCapacity,
                 default_price: values.price,
                 default_package_units: values.units,
                 registration_deadline: values.registrationDeadline,
@@ -3055,6 +3122,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
         booting, user, profile, activeTab, subView, toast, homeIntroExpanded,
         publicSessions, publicSessionsHasMore, sessionsLoading, filteredPublicSessions, expandedPublicRoster, SESSION_PLACEHOLDER_IMAGE,
         selectedSession, publicRoster, rosterLoading, canBookSelectedSession,
+        showBeginnerEdit, beginnerEditForm, beginnerEditLoading, beginnerEditError, openBeginnerEdit, saveBeginnerEdit,
         showAuth, authMode, authLoading, authError, authForm, showPassword,
         showBooking, bookingLoading, bookingError, bookingForm,
         recordsMode, recordsLoading, myBookings, myFinance, packageBalance,
@@ -3095,4 +3163,5 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
 </script>
 </body>
 </html>
+
 
