@@ -66,7 +66,7 @@
   </style>
 </head>
 <body>
-<div id="app" v-cloak class="min-h-screen flex justify-center"><div style="position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:99999;background:#1f2937;color:white;border-radius:16px;padding:10px 16px;display:flex;gap:12px;align-items:center;white-space:nowrap;font-size:13px"><span>樣式預覽</span><button @click="showProfile=false;openAuth('register')" style="color:#fdba74">註冊</button><button @click="showAuth=false;showProfile=true" style="color:#fdba74">個人資訊</button></div>
+<div id="app" v-cloak class="min-h-screen flex justify-center">
   <div class="w-full max-w-[480px] min-h-screen bg-white relative shadow-2xl overflow-hidden isolate">
 
     <!-- Global loading -->
@@ -2298,9 +2298,6 @@
       }
 
       async function submitAuth() {
-authError.value = '';
-if (authForm.value.remittanceEnabled && !/^[0-9]{5}$/.test(authForm.value.remittanceLastFive)) { authError.value = '請輸入完整的 5 位數字'; return; }
-showToast('樣式預覽完成，尚未送出或儲存資料'); return;
 
         authError.value = '';
         authLoading.value = true;
@@ -3039,7 +3036,6 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
       }
 
       onMounted(async () => {
-booting.value = false; openAuth('register'); return;
 
         await Promise.all([refreshAuthState(), loadPublicSessions()]);
         if (user.value && profile.value) {
