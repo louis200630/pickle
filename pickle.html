@@ -46,7 +46,12 @@
   <style>
     :root { color-scheme: light; }
     * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; background: #f8f8f8; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #f8f8f8; }
+    #app { height: 100vh; height: 100dvh; }
+    .app-frame { position: fixed; inset: 0; margin: 0 auto; width: 100%; max-width: 480px; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+    .app-header, .app-nav { flex: 0 0 auto; }
+    .app-main { flex: 1 1 0%; min-height: 0; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; scroll-padding-block: 16px; }
+    .app-frame > .absolute.inset-0 > .w-full { max-height: 100%; overflow-y: auto; overscroll-behavior-y: contain; }
     body { font-family: "Noto Sans TC", system-ui, sans-serif; color: #1F2937; font-size: 16px; }
     button, input, textarea, select { font: inherit; }
     button { min-height: 46px; }
@@ -66,8 +71,8 @@
   </style>
 </head>
 <body>
-<div id="app" v-cloak class="min-h-screen flex justify-center">
-  <div class="w-full max-w-[480px] min-h-screen bg-white relative shadow-2xl overflow-hidden isolate">
+<div id="app" v-cloak class="flex justify-center">
+  <div class="app-frame bg-white shadow-2xl isolate">
 
     <!-- Global loading -->
     <Transition name="fade">
@@ -80,7 +85,7 @@
     </Transition>
 
     <!-- Header -->
-    <header class="sticky top-0 z-30 relative bg-white/95 backdrop-blur border-b border-line">
+    <header class="app-header z-30 relative bg-white/95 backdrop-blur border-b border-line">
       <div class="px-5 pt-[max(16px,env(safe-area-inset-top))] pb-4 flex items-center justify-between gap-3">
         <button v-if="subView" @click="closeSubView" class="w-11 h-11 min-h-0 rounded-full flex items-center justify-center text-ink hover:bg-gray-100 active:scale-95 transition">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -108,7 +113,7 @@
     </header>
 
     <!-- Main content -->
-    <main class="app-scroll overflow-y-auto relative z-10" :class="subView ? 'pb-8' : 'pb-28'" style="height: calc(100vh - 78px);">
+    <main class="app-main app-scroll overflow-y-auto relative z-10" :class="subView ? 'pb-8' : 'pb-5'">
 
       <!-- Session detail -->
       <Transition name="card" mode="out-in">
@@ -148,7 +153,7 @@
               <div class="flex justify-between items-end mb-2">
                 <div>
                   <div class="font-bold">報名進度</div>
-                  <div class="text-[14px] text-muted mt-1">剩餘 {{ selectedSession.remaining_spots }} 個名額</div><div class="text-[13px] text-brand-700 font-semibold mt-2">新手名額剩 {{ selectedSession.beginner_remaining }} 位</div>
+                  <div class="text-[14px] text-muted mt-1 flex flex-wrap items-center gap-x-4 gap-y-1"><span>剩餘 {{ selectedSession.remaining_spots }} 個名額</span><span>新手名額剩 {{ selectedSession.beginner_remaining }} 位</span></div>
                 </div>
                 <div class="font-bold text-[17px]">{{ selectedSession.registered_count }} / {{ selectedSession.capacity }}</div>
               </div>
@@ -425,9 +430,9 @@
                 </div>
 
                 <div class="mt-4">
-                  <div class="flex justify-between items-center data-text mb-2">
-                    <span class="text-muted">{{ session.status === 'open' ? `剩 ${session.remaining_spots} 個名額` : '最終名單' }}</span><span v-if="session.status === 'open'" class="text-brand-700 text-[13px]">新手名額剩 {{ session.beginner_remaining }} 位</span>
-                    <span class="font-bold">{{ session.registered_count }} / {{ session.capacity }}</span>
+                  <div class="flex justify-between items-start gap-3 data-text mb-2">
+                    <div class="text-muted flex flex-wrap items-center gap-x-3 gap-y-1"><span>{{ session.status === 'open' ? `剩 ${session.remaining_spots} 個名額` : '最終名單' }}</span><span v-if="session.status === 'open'">新手名額剩 {{ session.beginner_remaining }} 位</span></div>
+                    <span class="font-bold shrink-0">{{ session.registered_count }} / {{ session.capacity }}</span>
                   </div>
                   <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
                     <div class="h-full rounded-full bg-brand-500" :style="{ width: sessionProgress(session) + '%' }"></div>
@@ -751,7 +756,7 @@
     </main>
 
     <!-- Bottom nav -->
-    <nav v-if="!subView" class="absolute bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur border-t border-line safe-bottom">
+    <nav v-if="!subView" class="app-nav relative z-30 bg-white/95 backdrop-blur border-t border-line safe-bottom">
       <div class="h-[70px] flex items-stretch">
         <button @click="goTab('home')" class="flex-1 min-h-0 flex flex-col items-center justify-center gap-1 transition" :class="activeTab === 'home' ? 'text-brand-600' : 'text-gray-400'">
           <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>
@@ -889,12 +894,11 @@
                 </div>
               </div>
 
-              <div class="rounded-2xl border border-brand-100 bg-brand-50/50 p-4">
-<label class="flex items-center gap-3 cursor-pointer"><input v-model="bookingForm.isBeginner" type="checkbox" class="w-5 h-5 accent-orange-500"><span class="font-bold">新手<span class="font-normal text-[13px] text-muted ml-2">本人／代報參加者</span></span></label>
-<div v-if="bookingForm.mode === 'self' && bookingForm.group" class="mt-4"><label for="booking-companions" class="block font-semibold mb-2">同行新手人數（不含本人）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-full h-12 rounded-xl border border-line bg-white px-4"></div>
-<p class="text-[13px] text-muted mt-3 mb-0">新手由參加者自行勾選，不依 DUPR 判定。</p>
-<div class="text-[14px] text-brand-700 font-semibold mt-2">新手合計 {{ Number(bookingForm.isBeginner) + (bookingForm.group ? Number(bookingForm.companionBeginners || 0) : 0) }} 位 · 名額剩 {{ selectedSession?.beginner_remaining }} 位</div></div>
-<button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名') }}</button>
+              <div class="text-[14px] text-gray-600">
+                <label class="inline-flex items-center gap-2 cursor-pointer select-none"><input v-model="bookingForm.isBeginner" type="checkbox" class="w-4 h-4 accent-orange-500"><span>新手</span></label>
+                <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="mt-3 flex items-center justify-between gap-3"><label for="booking-companions">同行新手人數（不含本人）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line bg-white px-3"></div>
+              </div>
+              <button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名') }}</button>
             </div>
           </div>
         </Transition>
@@ -904,9 +908,8 @@
     <!-- BEGINNER EDIT -->
 <Transition name="fade"><div v-if="showBeginnerEdit" class="absolute inset-0 z-50 bg-black/40 flex items-end" @click.self="!beginnerEditLoading && (showBeginnerEdit = false)"><div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom max-h-[90vh] overflow-y-auto">
 <div class="flex justify-between items-center mb-5"><h2 class="text-[24px] font-bold">編輯新手資料</h2><button @click="showBeginnerEdit = false" :disabled="beginnerEditLoading" aria-label="關閉" class="w-11 h-11 rounded-full bg-gray-100">×</button></div>
-<p class="text-[14px] text-muted mb-4">取消新手勾選會釋出新手名額；取消整筆報名時會自動釋出全部名額。</p>
 <div v-if="beginnerEditError" role="alert" class="mb-4 rounded-xl bg-red-50 text-red-700 p-3">{{ beginnerEditError }}</div>
-<div class="rounded-2xl border border-line bg-gray-50 p-4"><label class="flex items-center gap-3 cursor-pointer"><input v-model="beginnerEditForm.isBeginner" type="checkbox" class="w-5 h-5 accent-orange-500"><span class="font-bold">新手（參加者本人）</span></label><div v-if="beginnerEditForm.partySize > 1" class="mt-4"><label class="block font-semibold mb-2">同行新手人數（不含本人）</label><input v-model.number="beginnerEditForm.companionBeginners" type="number" min="0" :max="beginnerEditForm.partySize - 1" step="1" class="w-full h-12 rounded-xl border border-line px-4"></div></div>
+<div class="text-[14px] text-gray-600"><label class="inline-flex items-center gap-2 cursor-pointer select-none"><input v-model="beginnerEditForm.isBeginner" type="checkbox" class="w-4 h-4 accent-orange-500"><span>新手</span></label><div v-if="beginnerEditForm.partySize > 1" class="mt-3 flex items-center justify-between gap-3"><label for="beginnerEditForm-companions">同行新手人數（不含本人）</label><input id="beginnerEditForm-companions" v-model.number="beginnerEditForm.companionBeginners" type="number" min="0" :max="beginnerEditForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line px-3"></div></div>
 <button @click="saveBeginnerEdit" :disabled="beginnerEditLoading" class="mt-5 w-full rounded-xl bg-brand-500 text-white font-bold py-3 disabled:opacity-50">{{ beginnerEditLoading ? '儲存中…' : '儲存新手資料' }}</button>
 </div></div></Transition>
 <!-- PROFILE SHEET -->
@@ -967,7 +970,7 @@
               <div><label class="font-bold block mb-2">新參加者暱稱</label><input v-model.trim="substituteForm.nickname" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               <div><label class="font-bold block mb-2">新參加者手機</label><input v-model.trim="substituteForm.phone" type="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               <div><label class="font-bold block mb-2">備註</label><input v-model.trim="substituteForm.note" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="選填"></div>
-              <div class="rounded-2xl border border-line bg-gray-50 p-4"><label class="flex items-center gap-3 cursor-pointer"><input v-model="substituteForm.isBeginner" type="checkbox" class="w-5 h-5 accent-orange-500"><span class="font-bold">新手（參加者本人）</span></label><div v-if="substituteForm.partySize > 1" class="mt-4"><label class="block font-semibold mb-2">同行新手人數（不含本人）</label><input v-model.number="substituteForm.companionBeginners" type="number" min="0" :max="substituteForm.partySize - 1" step="1" class="w-full h-12 rounded-xl border border-line px-4"></div></div><button @click="submitSubstitute" :disabled="substituteLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ substituteLoading ? '處理中…' : '確認更換' }}</button>
+              <div class="text-[14px] text-gray-600"><label class="inline-flex items-center gap-2 cursor-pointer select-none"><input v-model="substituteForm.isBeginner" type="checkbox" class="w-4 h-4 accent-orange-500"><span>新手</span></label><div v-if="substituteForm.partySize > 1" class="mt-3 flex items-center justify-between gap-3"><label for="substituteForm-companions">同行新手人數（不含本人）</label><input id="substituteForm-companions" v-model.number="substituteForm.companionBeginners" type="number" min="0" :max="substituteForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line px-3"></div></div><button @click="submitSubstitute" :disabled="substituteLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ substituteLoading ? '處理中…' : '確認更換' }}</button>
             </div>
           </div>
         </Transition>
