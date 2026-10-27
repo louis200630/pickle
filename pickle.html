@@ -970,10 +970,10 @@
 
 <!-- PROFILE SHEET -->
     <Transition name="fade">
-      <div v-if="showProfile" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showProfile = false">
+      <div v-if="showProfile" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="closeProfile">
         <Transition name="sheet" appear>
           <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float max-h-[90vh] overflow-y-auto app-scroll">
-            <div class="flex items-center justify-between"><div><div class="text-[14px] font-bold text-brand-600">PROFILE</div><h2 class="text-[24px] font-bold mt-1">我的資料</h2></div><button @click="showProfile = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+            <div class="flex items-center justify-between"><div><div class="text-[14px] font-bold text-brand-600">PROFILE</div><h2 class="text-[24px] font-bold mt-1">我的資料</h2></div><button @click="closeProfile" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
             <div v-if="profileError" class="mt-4 rounded-xl bg-red-50 border border-red-100 text-red-700 p-3 data-text">{{ profileError }}</div>
             <div class="mt-5 flex flex-col gap-4">
               <div><label class="font-bold block mb-2">暱稱</label><input v-model.trim="profileForm.nickname" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
@@ -1795,13 +1795,16 @@
         await loadPublicSessions(false);
       }
 
-      async function loadProfile() {
-        if (!user.value) { profile.value = null; return; }
+      async function loadProfile(isCurrent = () => true, throwOnError = false) {
+        if (!user.value) { if (isCurrent()) profile.value = null; return; }
+        const userId = user.value.id;
         const { data, error } = await sb.from('players')
           .select('id,auth_user_id,phone,nickname,dupr_rating,role')
-          .eq('auth_user_id', user.value.id)
+          .eq('auth_user_id', userId)
           .single();
+        if (user.value?.id !== userId || !isCurrent()) return;
         if (error) {
+          if (throwOnError) throw error;
           profile.value = null;
           return;
         }
@@ -2466,6 +2469,7 @@
       }
 
       async function logout() {
+        closeProfile();
         closePaymentQr();
         await sb.auth.signOut();
         user.value = null;
@@ -2703,8 +2707,27 @@
         }
       }
 
+      let profileRequestSequence = 0;
+      function closeProfile() {
+        profileRequestSequence += 1;
+        showProfile.value = false;
+        profileLoading.value = false;
+        profileRemittanceReady.value = false;
+        profileForm.value.remittanceEnabled = false;
+        profileForm.value.remittanceLastFive = '';
+      }
+
+      function isCurrentProfileRequest(requestId, userId, playerId) {
+        return requestId === profileRequestSequence && showProfile.value
+          && user.value?.id === userId && profile.value?.id === playerId;
+      }
+
       async function openProfile() {
-        if (!profile.value) return;
+        if (!user.value || !profile.value) return;
+        const requestId = ++profileRequestSequence;
+        const userId = user.value.id;
+        const playerId = profile.value.id;
+        const isCurrent = () => isCurrentProfileRequest(requestId, userId, playerId);
         profileError.value = '';
         ownPhoneError.value = '';
         ownPhoneEdit.value = false;
@@ -2721,12 +2744,16 @@
         profileLoading.value = true;
         try {
           const { data, error } = await sb.rpc('get_my_remittance');
+          if (!isCurrent()) return;
           if (error) throw error;
           profileForm.value.remittanceEnabled = !!data;
           profileForm.value.remittanceLastFive = data || '';
           profileRemittanceReady.value = true;
-        } catch (e) { profileError.value = '匯款資料載入失敗，請關閉後再試一次'; }
-        finally { profileLoading.value = false; }
+        } catch (e) {
+          if (isCurrent()) profileError.value = '匯款資料載入失敗，請關閉後再試一次';
+        } finally {
+          if (isCurrent()) profileLoading.value = false;
+        }
       }
 
       function toggleOwnPhoneEdit() {
@@ -2839,7 +2866,11 @@
       }
 
       async function saveProfile() {
-        if (profileLoading.value) return;
+        if (profileLoading.value || !showProfile.value || !user.value || !profile.value) return;
+        const requestId = profileRequestSequence;
+        const userId = user.value.id;
+        const playerId = profile.value.id;
+        const isCurrent = () => isCurrentProfileRequest(requestId, userId, playerId);
         if (!profileRemittanceReady.value) { profileError.value = '匯款資料尚未載入，請關閉後再試一次'; return; }
         profileError.value = '';
         if (profileForm.value.remittanceEnabled && !/^[0-9]{5}$/.test(profileForm.value.remittanceLastFive)) { profileError.value = '請輸入完整的 5 位數字'; return; }
@@ -2867,15 +2898,17 @@
             p_last_five: profileForm.value.remittanceEnabled ? profileForm.value.remittanceLastFive : null,
             p_dupr_rating: duprRating
           });
+          if (!isCurrent()) return;
           if (profileUpdateError) throw profileUpdateError;
 
-          await loadProfile();
-          showProfile.value = false;
+          await loadProfile(isCurrent, true);
+          if (!isCurrent()) return;
+          closeProfile();
           showToast('個人資料已更新');
         } catch (e) {
-          profileError.value = friendlyError(e);
+          if (isCurrent()) profileError.value = friendlyError(e);
         } finally {
-          profileLoading.value = false;
+          if (isCurrent()) profileLoading.value = false;
         }
       }
 
@@ -3262,7 +3295,14 @@
           }
         }
         sb.auth.onAuthStateChange(async (event, session) => {
-          if (event === 'SIGNED_OUT') { closePaymentQr(); return; }
+          if (event === 'SIGNED_OUT') {
+            closeProfile();
+            closePaymentQr();
+            user.value = null;
+            profile.value = null;
+            return;
+          }
+          if (user.value?.id !== session?.user?.id) closeProfile();
           user.value = session?.user || null;
         });
         booting.value = false;
@@ -3278,7 +3318,7 @@
         showBooking, bookingLoading, bookingAvailabilityLoading, bookingError, bookingForm,
         recordsMode, recordsLoading, myBookings, myFinance, packageBalance,
         myBookingsHasMore, myFinanceHasMore,
-        showProfile, profileLoading, profileRemittanceReady, profileError, profileForm, ownPhoneEdit, ownPhoneLoading, ownPhoneError, ownPhoneForm,
+        closeProfile, showProfile, profileLoading, profileRemittanceReady, profileError, profileForm, ownPhoneEdit, ownPhoneLoading, ownPhoneError, ownPhoneForm,
         ownPasswordEdit, ownPasswordLoading, ownPasswordError, ownPasswordForm,
         showSubstitute, substituteLoading, substituteForm, substituteContext,
         adminMode, adminSessions, adminSessionsHasMore, adminSelectedSession, adminRoster, adminRosterLoading, adminRosterParticipantCount,
