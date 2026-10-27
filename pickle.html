@@ -175,7 +175,7 @@
               <div class="flex justify-between items-end mb-2">
                 <div>
                   <div class="font-bold">報名進度</div>
-                  <div class="text-[14px] text-muted mt-1 flex flex-wrap items-center gap-x-1 gap-y-1"><span>剩餘 {{ selectedSession.remaining_spots }} 個名額</span><span aria-hidden="true">・</span><span>新手名額剩 {{ selectedSession.beginner_remaining }} 位</span></div>
+                  <div class="text-[14px] text-muted mt-1 flex flex-wrap items-center gap-x-1 gap-y-1"><span>剩餘 {{ selectedSession.remaining_spots }} 個名額</span><template v-if="Number(selectedSession.beginner_capacity) > 0"><span aria-hidden="true">・</span><span>新手名額剩 {{ selectedSession.beginner_remaining }} 位</span></template></div>
                 </div>
                 <div class="font-bold text-[17px]">{{ selectedSession.registered_count }} / {{ selectedSession.capacity }}</div>
               </div>
@@ -470,7 +470,7 @@
 
                 <div class="mt-4">
                   <div class="flex justify-between items-start gap-3 data-text mb-2">
-                    <div class="text-muted flex flex-wrap items-center gap-x-1 gap-y-1"><span>{{ session.status === 'open' ? `剩 ${session.remaining_spots} 個名額` : '最終名單' }}</span><span v-if="session.status === 'open'" aria-hidden="true">・</span><span v-if="session.status === 'open'">新手名額剩 {{ session.beginner_remaining }} 位</span></div>
+                    <div class="text-muted flex flex-wrap items-center gap-x-1 gap-y-1"><span>{{ session.status === 'open' ? `剩 ${session.remaining_spots} 個名額` : '最終名單' }}</span><template v-if="session.status === 'open' && Number(session.beginner_capacity) > 0"><span aria-hidden="true">・</span><span>新手名額剩 {{ session.beginner_remaining }} 位</span></template></div>
                     <span class="font-bold shrink-0">{{ session.registered_count }} / {{ session.capacity }}</span>
                   </div>
                   <div class="w-full h-2 rounded-full bg-gray-100 overflow-hidden">
