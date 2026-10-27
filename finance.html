@@ -90,12 +90,14 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
       <div v-if="tab==='overview'">
         <div class="section-head"><h2>財務總覽</h2><span class="pill">Google Sheets 同步</span></div>
         <div class="grid">
-          <div class="kpi accent"><div class="label">已同步待匯團主</div><div class="amount">{{money(totals.due)}}</div><div class="hint">只計已結算且明細同步完成</div></div>
+          <div class="kpi accent"><div class="label">待支付團主結算款</div><div class="amount">{{money(totals.due)}}</div><div class="hint">不含整筆套票轉交款</div></div>
           <div class="kpi"><div class="label">已結算場次盈餘</div><div class="amount">{{money(totals.profit)}}</div><div class="hint">不含暫估場次</div></div>
-          <div class="kpi"><div class="label">已匯團主</div><div class="amount">{{money(totals.paid)}}</div><div class="hint">已登記匯出款項</div></div>
+          <div class="kpi"><div class="label">已支付結算款</div><div class="amount">{{money(totals.paid)}}</div><div class="hint">不含提前轉交球友費及整張套票原款</div></div>
           <div class="kpi"><div class="label">已結算活動收入</div><div class="amount">{{money(totals.revenue)}}</div><div class="hint">含已使用套票認列</div></div>
         </div>
         <div v-if="items.some(s=>s.status==='settled' && !s.breakdown_ready)" class="notice warning">部分已結算場次尚未同步收入分類。為避免顯示舊金額，這些場次暫不計入上方總覽；請部署 Apps Script v5 後重新同步。</div>
+        <div v-if="independentLoaded" class="notice">尚待轉交團主的系統套票原款：<b>{{money(pendingPassTotal)}}</b>。<span v-if="unknownPassCount" style="color:#9a3412">另有 {{unknownPassCount}} 筆系統套票尚未確認由誰收款，暫不列入待匯。</span></div>
+        <div v-else class="notice warning">尚未讀取套票轉交狀態，請到「收款紀錄」重新整理。</div>
         <div class="section-head"><h2>最近場次</h2><button class="btn secondary" style="font-size:12px;min-height:35px;padding:7px 12px" @click="tab='sessions'">查看全部</button></div>
         <div v-if="!items.length" class="center">還沒有場次帳務資料。</div>
         <div class="card" v-for="s in items.slice(0,4)" :key="'o'+s.row"><button class="cardbtn" @click="open(s)">
@@ -108,7 +110,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
       <div v-if="tab==='sessions' || tab==='transfers'">
         <div class="section-head"><h2>{{tab==='sessions'?'場次帳務':'團主匯款對帳'}}</h2><span class="pill">{{filtered.length}} 場</span></div>
         <div class="filters" v-if="tab==='sessions'"><button :class="{on:filter==='all'}" @click="filter='all'">全部</button><button :class="{on:filter==='settled'}" @click="filter='settled'">已結算</button><button :class="{on:filter==='open'}" @click="filter='open'">未結算</button></div>
-        <div class="notice" v-if="tab==='transfers'">只要打開場次，填入「本次已匯團主」（累計匯款額），儲存後待匯金額會由試算表自動重新計算。</div>
+        <div class="notice" v-if="tab==='transfers'">場次「已支付團主結算款」只記代墊與分潤的實際結算匯款。套票購買原款在「收款紀錄」另外標示已轉交及日期，不可重複列入。</div>
         <div class="card" v-for="s in filtered" :key="s.row"><button class="cardbtn" @click="open(s)">
           <div class="cardtop"><div><div class="date">{{s.date}}</div><div class="venue">{{s.venue}}</div></div><span class="pill" :class="{warn:s.status!=='settled'}">{{s.status==='settled'?'已結算':'暫估／未結算'}}</span></div>
           <div class="metrics"><div><small>系統收入</small><b>{{s.status==='settled'&&!s.breakdown_ready?'待同步':money(s.system_income)}}</b></div><div><small>場次盈餘</small><b>{{s.status==='settled'&&!s.breakdown_ready?'待同步':money(s.profit)}}</b></div><div><small>待匯團主</small><b>{{s.status==='settled'&&!s.breakdown_ready?'待同步':money(s.due)}}</b></div></div>
@@ -119,8 +121,9 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
       </div>
       <div v-if="tab==='independent'">
         <div class="section-head"><h2>獨立收款紀錄</h2><button class="btn" style="min-height:38px;padding:8px 14px;font-size:12px" @click="newIndependent">＋ 新增紀錄</button></div>
-        <div class="notice">這裡只記錄日期、項目、金額與備註。即使是混合匯款，也只記下實際金流；<b>不會自動加進場次營收、分潤或套票次數</b>。</div>
-        <div v-if="independentError" class="error">{{independentError}}<div class="muted" style="margin-top:7px">若尚未更新 Apps Script，請先部署「財務中心 v4」。</div></div>
+        <div class="notice">每筆系統套票購買可手動確認「待轉交／已轉交／團主直接收款」及轉交日期。只有系統購票 ID 的「待轉交」會加入待匯套票總額；手動混合匯款備忘不重複計入。</div>
+        <div class="formgroup"><div class="row between"><b>尚待轉交套票原款</b><b>{{independentLoaded?money(pendingPassTotal):'尚未讀取'}}</b></div><p v-if="unknownPassCount" class="revenue-warn">{{unknownPassCount}} 筆購票尚未確認歸屬，未列入合計，請確認後標示。</p></div>
+        <div v-if="independentError" class="error">{{independentError}}<div class="muted" style="margin-top:7px">若轉交狀態無法讀取或儲存，請先將 Apps Script 更新至 v7。</div></div>
         <div v-if="independentLoading" class="center"><div class="spinner"></div>讀取獨立收款紀錄…</div>
         <template v-else>
           <div v-if="!independentItems.length" class="center">目前沒有獨立收款紀錄，點「新增紀錄」開始記帳。</div>
@@ -130,10 +133,12 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
               <div class="row between" style="margin-top:10px"><b style="color:var(--dark);font-size:20px">{{money(m.amount)}}</b><span class="muted">編輯 ↗</span></div>
               <p v-if="m.notes" class="muted" style="margin-top:9px;white-space:pre-wrap;overflow-wrap:anywhere">{{m.notes}}</p>
             </button>
+            <div v-if="m.editable && m.transfer_editable" style="padding:0 16px 13px"><button class="btn secondary" style="font-size:12px;padding:7px 10px;min-height:34px" @click="openTransfer(m)">轉交：{{transferLabel(m.transfer_status)}}{{m.transferred_on?' · '+m.transferred_on:''}}</button></div>
             <div v-else style="padding:16px">
               <div class="cardtop"><div><div class="date">{{m.date}}</div><div class="venue">{{m.item}}</div></div><span class="pill gray">系統同步・唯讀</span></div>
               <b style="display:block;color:var(--dark);margin-top:10px">{{money(m.amount)}}</b>
               <p v-if="m.notes" class="muted" style="margin-top:9px;white-space:pre-wrap">{{m.notes}}</p>
+              <button v-if="m.transfer_editable" class="btn secondary" style="margin-top:12px;min-height:34px;font-size:12px;padding:7px 10px" @click="openTransfer(m)">轉交：{{transferLabel(m.transfer_status)}}{{m.transferred_on?' · '+m.transferred_on:''}}</button>
             </div>
           </div>
         </template>
