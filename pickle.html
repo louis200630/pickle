@@ -54,7 +54,10 @@
     .desktop-card-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
     .desktop-card-grid > article { min-width: 0; }
     .desktop-grid-full { grid-column: 1 / -1; }
-    @media (min-width: 1024px) {
+    @media (min-width: 768px) {
+      .desktop-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (min-width: 1200px) {
       .desktop-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
     .app-main { flex: 1 1 0%; min-height: 0; overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; scroll-padding-block: 16px; }
@@ -99,7 +102,7 @@
         </button>
         <div v-else class="flex items-center gap-3 min-w-0">
           <div class="w-10 h-10 rounded-xl bg-brand-500 text-white flex items-center justify-center shadow-sm shrink-0">
-            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 5.2c2 3.1 2.1 10.2 0 13.6"/><path d="M16 5.2c-2 3.1-2.1 10.2 0 13.6"/><path d="M3.7 9.6h16.6"/><path d="M3.7 14.4h16.6"/></svg>
+            <svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           </div>
           <div class="min-w-0">
             <div class="font-bold text-[21px] leading-tight tracking-tight">Pickle Stars</div>
