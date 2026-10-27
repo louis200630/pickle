@@ -784,7 +784,7 @@
                           <td class="px-3 py-3 whitespace-nowrap text-gray-600">{{ formatDateTime(row.created_at) }}</td>
                           <td class="px-3 py-3">
                             <div class="font-semibold">{{ row.nickname }}</div>
-                            <div v-if="Number(row.party_size || 1) > 1" class="text-[12px] text-gray-500 font-semibold mt-0.5">{{ row.party_size }} 位·同行 {{ Number(row.party_size) - 1 }}</div>
+                            <div v-if="Number(row.party_size || 1) > 1" class="text-[11px] text-gray-500 font-semibold mt-0.5">{{ row.party_size }} 位·同行 {{ Number(row.party_size) - 1 }}</div>
                             <div class="text-[13px] text-muted mt-0.5">{{ row.phone }}</div>
                           </td>
                           <td class="px-3 py-3 text-right font-medium">{{ row.package_balance_after ?? '—' }}</td>
