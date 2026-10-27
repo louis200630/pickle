@@ -961,7 +961,7 @@
               <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="text-[14px] text-gray-600">
                 <div class="flex items-center justify-between gap-3"><label for="booking-companions">同行新手人數（不含本人）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line bg-white px-3"></div>
               </div>
-              <button @click="submitBooking" :disabled="bookingLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名') }}</button>
+              <button @click="submitBooking" :disabled="bookingLoading || bookingAvailabilityLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingAvailabilityLoading ? '更新名額中…' : (bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名')) }}</button>
             </div>
           </div>
         </Transition>
@@ -1473,6 +1473,7 @@
 
       const showBooking = ref(false);
       const bookingLoading = ref(false);
+      const bookingAvailabilityLoading = ref(false);
       const bookingError = ref('');
       const bookingForm = ref({ mode: 'self', nickname: '', phone: '', group: false, partySize: 2, isBeginner: false, companionBeginners: 0 });
 
@@ -2477,7 +2478,20 @@
         showToast('已登出');
       }
 
-      function startBooking(session) {
+      let bookingAvailabilityRequest = 0;
+      async function fetchSessionAvailability(sessionId) {
+        const { data, error } = await sb.rpc('get_public_session_availability', { p_session_id: sessionId });
+        if (error) throw error;
+        if (!data) throw new Error('此場次已停止報名，請重新選擇場次');
+        return data;
+      }
+      function applySessionAvailability(data) {
+        const listed = publicSessions.value.find(session => session.id === data.id);
+        if (listed) Object.assign(listed, data);
+        if (selectedSession.value?.id === data.id) Object.assign(selectedSession.value, data);
+      }
+      async function startBooking(session) {
+        if (bookingLoading.value) return;
         if (!user.value || !profile.value) {
           openAuth('login');
           return;
@@ -2486,6 +2500,16 @@
         bookingError.value = '';
         setBookingMode('self');
         showBooking.value = true;
+        bookingAvailabilityLoading.value = true;
+        const request = ++bookingAvailabilityRequest;
+        try {
+          const data = await fetchSessionAvailability(session.id);
+          if (request === bookingAvailabilityRequest && selectedSession.value?.id === session.id) applySessionAvailability(data);
+        } catch (e) {
+          if (request === bookingAvailabilityRequest && showBooking.value) bookingError.value = friendlyError(e);
+        } finally {
+          if (request === bookingAvailabilityRequest) bookingAvailabilityLoading.value = false;
+        }
       }
 
       function setBookingMode(mode) {
@@ -2527,36 +2551,49 @@
       }
 
       async function submitBooking() {
+        if (bookingLoading.value || bookingAvailabilityLoading.value) return;
         bookingError.value = '';
         bookingLoading.value = true;
+        const sessionId = selectedSession.value?.id;
+        let attemptedBooking = false;
         try {
-          if (!bookingForm.value.nickname) throw new Error('請輸入參加者暱稱');
+          if (!sessionId) throw new Error('請重新選擇場次');
+          const nickname = bookingForm.value.nickname;
+          if (!nickname) throw new Error('請輸入參加者暱稱');
           const phone = normalizePhone(bookingForm.value.phone);
-          const partySize = bookingForm.value.mode === 'self' && bookingForm.value.group
-            ? Math.max(2, Number(bookingForm.value.partySize || 2))
-            : 1;
-          const companionBeginners = bookingForm.value.group ? Number(bookingForm.value.companionBeginners) : 0;
+          const group = bookingForm.value.mode === 'self' && bookingForm.value.group;
+          const partySize = group ? Math.max(2, Number(bookingForm.value.partySize || 2)) : 1;
+          const companionBeginners = group ? Number(bookingForm.value.companionBeginners) : 0;
+          const isBeginner = Boolean(bookingForm.value.isBeginner);
+          const selfBooking = bookingForm.value.mode === 'self';
+          if (!Number.isInteger(partySize)) throw new Error('報名人數必須為整數');
           if (!Number.isInteger(companionBeginners) || companionBeginners < 0 || companionBeginners >= partySize) throw new Error('同行新手人數必須介於 0 與同行人數之間');
-          if (Number(bookingForm.value.isBeginner) + companionBeginners > Number(selectedSession.value.beginner_remaining)) throw new Error('新手名額不足，請調整新手人數或選擇其他場次');
+
+          // Refresh this exact session; the booking RPC makes the final capacity decision.
+          applySessionAvailability(await fetchSessionAvailability(sessionId));
+          attemptedBooking = true;
           const { error } = await sb.rpc('create_booking_with_beginners', {
-            p_session_id: selectedSession.value.id,
+            p_session_id: sessionId,
             p_phone: phone,
-            p_nickname: bookingForm.value.nickname,
+            p_nickname: nickname,
             p_party_size: partySize,
-            p_is_beginner: bookingForm.value.isBeginner,
-            p_companion_beginner_count: bookingForm.value.group ? Number(bookingForm.value.companionBeginners) : 0
+            p_is_beginner: isBeginner,
+            p_companion_beginner_count: companionBeginners
           });
           if (error) throw error;
           showBooking.value = false;
           await Promise.all([loadPublicSessions(), loadMyData(true)]);
-          const refreshed = publicSessions.value.find(s => s.id === selectedSession.value.id);
-          if (refreshed) selectedSession.value = refreshed;
-          if (subView.value === 'session') {
-            const roster = await sb.rpc('get_public_roster_with_beginners', { p_session_id: selectedSession.value.id });
+          try { applySessionAvailability(await fetchSessionAvailability(sessionId)); } catch {}
+          if (subView.value === 'session' && selectedSession.value?.id === sessionId) {
+            const roster = await sb.rpc('get_public_roster_with_beginners', { p_session_id: sessionId });
             if (!roster.error) publicRoster.value = roster.data || [];
           }
-          showToast(bookingForm.value.mode === 'self' ? '報名成功，等待主辦方確認收款' : '已成功幫朋友報名');
+          showToast(selfBooking ? '報名成功，等待主辦方確認收款' : '已成功幫朋友報名');
         } catch (e) {
+          // Preserve the original rejection and entered form even if refreshing fails.
+          if (attemptedBooking) {
+            try { applySessionAvailability(await fetchSessionAvailability(sessionId)); } catch {}
+          }
           bookingError.value = friendlyError(e);
         } finally {
           bookingLoading.value = false;
@@ -3238,7 +3275,7 @@
         beginnerRowChanged, saveInlineBeginners,
         showPaymentQr, paymentQrLoading, paymentQrError, paymentQrUrl, paymentQrFilename, openPaymentQr, closePaymentQr,
         showAuth, authMode, authLoading, authError, authForm, showPassword,
-        showBooking, bookingLoading, bookingError, bookingForm,
+        showBooking, bookingLoading, bookingAvailabilityLoading, bookingError, bookingForm,
         recordsMode, recordsLoading, myBookings, myFinance, packageBalance,
         myBookingsHasMore, myFinanceHasMore,
         showProfile, profileLoading, profileRemittanceReady, profileError, profileForm, ownPhoneEdit, ownPhoneLoading, ownPhoneError, ownPhoneForm,
