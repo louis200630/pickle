@@ -154,6 +154,17 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
       <div class="sheetbar"><div><b>{{editing.date}}｜{{editing.venue}}</b><div class="muted">{{editing.status==='settled'?'已結算':'未結算・目前為暫估'}}</div></div><button aria-label="關閉" @click="editing=null">×</button></div>
       <div class="bigsum"><span>尚需匯團主（Google Sheets 計算）</span><b>{{money(editing.due)}}</b></div>
       <div class="row between" style="padding:0 1px 5px"><span class="muted">系統自動收入</span><b>{{money(editing.system_income)}}</b></div>
+      <div v-if="editing.status==='settled'" class="formgroup">
+        <h3>正式結算同步</h3>
+        <p class="muted">將 Supabase 已鎖定的結算快照重新寫入 Google Sheets，更新現金、季票、月票明細。此操作不會重新結算場次，也不會扣除套票。</p>
+        <div class="row between" style="margin-top:10px;gap:10px;align-items:stretch">
+          <button type="button" class="btn secondary grow" :disabled="working || syncing || hasChanges" @click="syncSettledFinance">
+            {{syncing?'同步中…':editing.breakdown_ready?'↻ 重新同步財務報表':'同步正式收入到 Google Sheets'}}
+          </button>
+        </div>
+        <p v-if="hasChanges" class="muted" style="margin-top:8px">請先儲存或取消下方尚未儲存的修改，才能同步正式收入。</p>
+        <p v-if="syncStatus" class="notice" style="margin-bottom:0">{{syncStatus}}</p>
+      </div>
       <div v-if="editing.breakdown_ready" class="formgroup">
         <h3>場次收入組成（正式同步）</h3>
         <div class="revenue-lines">
@@ -225,7 +236,7 @@ function parsePhone(raw){let d=String(raw||'').replace(/\D/g,'');if(d.startsWith
 const {createApp,ref,computed,onMounted}=Vue;
 createApp({
 setup(){
-const booting=ref(true),loggedIn=ref(false),loading=ref(false),working=ref(false),error=ref('');
+const booting=ref(true),loggedIn=ref(false),loading=ref(false),working=ref(false),syncing=ref(false),syncStatus=ref(''),error=ref('');
 const phone=ref(''),password=ref(''),tab=ref('overview'),filter=ref('all'),items=ref([]),updatedAt=ref('');
 const editing=ref(null),draft=ref({}),original=ref({});
  const independentItems=ref([]),independentLoading=ref(false),independentError=ref(''),independentEditing=ref(false);
@@ -297,7 +308,25 @@ async function loadIndependent(){
   }catch(e){error.value=e.message||'登入失敗';}finally{working.value=false;}
 }
 async function logout(){await client.auth.signOut();loggedIn.value=false;items.value=[];independentItems.value=[];error.value='';independentError.value='';editing.value=null;independentEditing.value=false;}
-function open(s){editing.value={...s};draft.value=Object.fromEntries(KEYS.map(k=>[k,s[k]??(k==='notes'?'':0)]));original.value={...draft.value};error.value='';}
+function open(s){editing.value={...s};draft.value=Object.fromEntries(KEYS.map(k=>[k,s[k]??(k==='notes'?'':0)]));original.value={...draft.value};error.value='';syncStatus.value='';}
+ async function syncSettledFinance(){
+   if(!editing.value||editing.value.status!=='settled'||syncing.value||working.value||hasChanges.value)return;
+   const sessionId=editing.value.session_id;
+   syncing.value=true;syncStatus.value='';error.value='';
+   try{
+     const {data, error:callError}=await client.functions.invoke('sync-session-finance',{body:{session_id:sessionId}});
+     if(callError){let message=callError.message||'財務同步連線失敗';try{const p=await callError.context?.json();if(p?.error)message=p.error;}catch(_){}throw new Error(message);}
+     if(!data?.synced)throw new Error(data?.error||'財務報表尚未完成同步');
+     if(data.breakdown_synced!==true)throw new Error('場次已寫入，但 Apps Script 未確認收入分類。請檢查 v5 是否已部署。');
+     await load();
+     const current=items.value.find(x=>x.session_id===sessionId);
+     if(current){open(current);}
+     if(!current?.breakdown_ready||current.income_difference!==0)
+       throw new Error('已送出同步，但試算表收入分類或檢核差額尚未驗證。請重新整理並檢查 Google Sheets。');
+     syncStatus.value='已同步正式收入與套票分類，收入檢核差額 NT$0。';
+   }catch(e){error.value=e.message||'同步失敗';}
+   finally{syncing.value=false;}
+ }
 async function save(){
   if(!editing.value||!hasChanges.value)return;
   const fields={};for(const k of KEYS){if(String(draft.value[k]??'')!==String(original.value[k]??''))fields[k]=draft.value[k];}
@@ -310,7 +339,7 @@ onMounted(async()=>{
   catch(e){error.value='請重新登入';}
   booting.value=false;if(loggedIn.value)await load();
 });
-return {booting,loggedIn,loading,working,error,phone,password,tab,filter,items,updatedAt,editing,draft,original,filtered,totals,money,hasChanges,load,login,logout,open,save,independentItems,independentLoading,independentError,independentEditing,memoDraft,memoOriginal,independentCanSave,loadIndependent,newIndependent,editIndependent,saveIndependent};
+return {booting,loggedIn,loading,working,syncing,syncStatus,error,phone,password,tab,filter,items,updatedAt,editing,draft,original,filtered,totals,money,hasChanges,load,login,logout,open,save,syncSettledFinance,independentItems,independentLoading,independentError,independentEditing,memoDraft,memoOriginal,independentCanSave,loadIndependent,newIndependent,editIndependent,saveIndependent};
 }
 }).mount('#finance-app');
 })();
