@@ -197,11 +197,23 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
             <div class="field"><label>團主本場球費抵扣</label><input type="number" min="0" step="1" v-model="draft.organizer_fee_offset"></div>
           </div>
         </div>
+        <div class="formgroup"><h3>本場收款核對</h3>
+          <p class="muted">「實際代收現金」只記本場收到的現金；整張套票預收款不直接計入場次收入。先前匯團主的本場款、套票本場核銷應分開記錄，避免差額虛增。</p>
+          <div class="formgrid">
+            <div class="field"><label>已提前匯團主的本場收入</label><input type="number" min="0" step="1" v-model="draft.organizer_early_income"></div>
+            <div class="field"><label>我保管套票本場認列</label><input type="number" min="0" step="1" v-model="draft.self_ticket_recognized"></div>
+            <div class="field"><label>我保管的整筆套票預收款</label><input type="number" min="0" step="1" v-model="draft.pass_cash_held"></div>
+            <div class="field"><label>我實際代收本場現金</label><input type="number" min="0" step="1" v-model="draft.cash_collected"></div>
+          </div>
+          <div class="row between" style="padding:10px 0 0"><span class="muted">本場收款核對差額</span><b :style="{color:reconcileDiff===0?'var(--primary)':'#b45309'}">{{reconcileDiff===null?'請填入代收現金':money(reconcileDiff)}}</b></div>
+          <p class="revenue-foot">差額 = 我代收現金 + 團主已有本場收入 + 提前匯出的本場收入 + 我保管套票本場核銷 + 團主球費抵扣 − 本場認列收入。整筆預收款不參與此計算。</p>
+          <p v-if="reconcileDiff!==null && reconcileDiff!==0" class="revenue-warn">仍有差額，請核對款項歸屬，不要直接把整張套票金額加到場次收益。</p>
+        </div>
         <details class="formgroup"><summary style="cursor:pointer;font-size:14px;font-weight:800;color:var(--dark)">其他核對欄位（需要時再填）</summary>
           <div class="formgrid">
             <div class="field"><label>我的本場球費</label><input type="number" min="0" step="1" v-model="draft.personal_fee"></div>
             <div class="field"><label>我已繳／套票核銷</label><input type="number" min="0" step="1" v-model="draft.personal_prepaid"></div>
-            <div class="field"><label>我實際代收現金</label><input type="number" min="0" step="1" v-model="draft.cash_collected"></div>
+            <div class="field"><label>分潤／球費特殊說明</label><input disabled value="套票代收與本場現金請在上方「本場收款核對」填寫"></div>
           </div><div class="muted">已買的季票每次使用，可在「我的本場球費」與「我已繳／套票核銷」分別記 380，不會再次要求付款。</div>
         </details>
         <div v-if="error" class="error">{{error}}</div>
@@ -230,7 +242,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
 const SUPABASE_URL='https://bpaxiozotebbkycwjsup.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_XYOLSLzLlIjiRcKZOSJnZQ_3nHIeHTg';
 const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-const KEYS=['manual_income','venue_cost','extra_cost','notes','organizer_advance','paid_organizer','personal_fee','personal_prepaid','organizer_holds','organizer_fee_offset','cash_collected'];
+const KEYS=['manual_income','venue_cost','extra_cost','notes','organizer_advance','paid_organizer','personal_fee','personal_prepaid','organizer_holds','organizer_fee_offset','cash_collected','organizer_early_income','self_ticket_recognized','pass_cash_held'];
 const fmt=new Intl.NumberFormat('zh-TW',{maximumFractionDigits:0});
 function parsePhone(raw){let d=String(raw||'').replace(/\D/g,'');if(d.startsWith('886'))d=(d.slice(3).startsWith('0')?'':'0')+d.slice(3);else if(d.length===9&&d.startsWith('9'))d='0'+d;if(!/^09\d{8}$/.test(d))throw Error('請輸入有效的台灣手機號碼');return d;}
 const {createApp,ref,computed,onMounted}=Vue;
@@ -245,6 +257,11 @@ const money=v=>'NT$'+fmt.format(Number(v||0));
 const filtered=computed(()=>items.value.filter(s=>tab.value==='transfers'?(s.status==='settled'&&s.due>0):filter.value==='all'?true:filter.value==='settled'?s.status==='settled':s.status!=='settled'));
 const totals=computed(()=>items.value.filter(s=>s.status==='settled' && s.breakdown_ready && s.income_difference===0).reduce((a,s)=>{a.due+=Number(s.due||0);a.profit+=Number(s.profit||0);a.paid+=Number(s.paid_organizer||0);a.revenue+=Number(s.system_income||0)+Number(s.manual_income||0);return a;},{due:0,profit:0,paid:0,revenue:0}));
 const hasChanges=computed(()=>KEYS.some(k=>String(draft.value[k]??'')!==String(original.value[k]??'')));
+ const reconcileDiff=computed(()=>{
+   if(!editing.value || draft.value.cash_collected==='' || draft.value.cash_collected===null) return null;
+   const n=k=>Number(draft.value[k]||0);
+   return n('cash_collected')+n('organizer_holds')+n('organizer_fee_offset')+n('organizer_early_income')+n('self_ticket_recognized')-Number(editing.value.system_income||0)-n('manual_income');
+ });
  const independentCanSave=computed(()=>!!memoDraft.value.date && !!String(memoDraft.value.item||'').trim() &&
   memoDraft.value.amount!=='' && Number.isSafeInteger(Number(memoDraft.value.amount)) && Number(memoDraft.value.amount)>=0 &&
   Number(memoDraft.value.amount)<=10000000 &&
@@ -339,7 +356,7 @@ onMounted(async()=>{
   catch(e){error.value='請重新登入';}
   booting.value=false;if(loggedIn.value)await load();
 });
-return {booting,loggedIn,loading,working,syncing,syncStatus,error,phone,password,tab,filter,items,updatedAt,editing,draft,original,filtered,totals,money,hasChanges,load,login,logout,open,save,syncSettledFinance,independentItems,independentLoading,independentError,independentEditing,memoDraft,memoOriginal,independentCanSave,loadIndependent,newIndependent,editIndependent,saveIndependent};
+return {booting,loggedIn,loading,working,syncing,syncStatus,error,phone,password,tab,filter,items,updatedAt,editing,draft,original,filtered,totals,money,hasChanges,reconcileDiff,load,login,logout,open,save,syncSettledFinance,independentItems,independentLoading,independentError,independentEditing,memoDraft,memoOriginal,independentCanSave,loadIndependent,newIndependent,editIndependent,saveIndependent};
 }
 }).mount('#finance-app');
 })();
