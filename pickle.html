@@ -106,7 +106,7 @@
           </div>
           <div class="min-w-0">
             <div class="font-bold text-[21px] leading-tight tracking-tight">Pickle Stars</div>
-            <div class="text-[13px] text-muted mt-0.5">v1.0</div>
+            <div class="text-[13px] text-muted mt-0.5">v1.1</div>
           </div>
         </div>
 
@@ -332,14 +332,14 @@
                 <div v-else-if="!row.financial_entry_id" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text border border-solid border-[#e5e5e5] text-muted">未保留待確認財務紀錄</div>
 
                 <div v-if="adminSelectedSession.status === 'open' && row.booking_status === 'active'" class="mt-3">
-<div class="mt-3 text-[14px] text-gray-600">
-  <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-    <label class="inline-flex items-center gap-2 cursor-pointer select-none"><input type="checkbox" :checked="row.beginnerDraft ?? row.is_beginner" @change="row.beginnerDraft = $event.target.checked; row.beginnerSaveError = ''" :disabled="row.beginnerSaving" class="w-4 h-4 accent-orange-500"><span>新手</span></label>
-    <label v-if="Number(row.party_size || 1) > 1" class="inline-flex items-center gap-2"><span>同行新手</span><input :value="row.companionBeginnerDraft ?? row.companion_beginner_count ?? 0" @input="row.companionBeginnerDraft = $event.target.value; row.beginnerSaveError = ''" :disabled="row.beginnerSaving" type="number" min="0" :max="Number(row.party_size) - 1" step="1" class="w-16 h-8 rounded-lg border border-line px-2 text-[13px] bg-white" :aria-label="'同行新手人數（不含本人）'"><span class="text-[13px]">位</span></label>
-    <button v-if="beginnerRowChanged(row)" @click="saveInlineBeginners(row)" :disabled="row.beginnerSaving" class="min-h-0 h-8 px-3 rounded-lg border border-line bg-white text-[13px] font-semibold text-gray-600 disabled:opacity-50">{{ row.beginnerSaving ? '儲存中…' : '儲存' }}</button>
-  </div>
-  <div v-if="row.beginnerSaveError" role="alert" class="text-[13px] text-red-600 mt-2">{{ row.beginnerSaveError }}</div>
-</div>
+                  <div class="mt-3 text-[14px] text-gray-600">
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+                      <label class="inline-flex items-center gap-2 cursor-pointer select-none"><input type="checkbox" :checked="row.beginnerDraft ?? row.is_beginner" @change="row.beginnerDraft = $event.target.checked; row.beginnerSaveError = ''" :disabled="row.beginnerSaving" class="w-4 h-4 accent-orange-500"><span>新手</span></label>
+                      <label v-if="Number(row.party_size || 1) > 1" class="inline-flex items-center gap-2"><span>同行新手</span><input :value="row.companionBeginnerDraft ?? row.companion_beginner_count ?? 0" @input="row.companionBeginnerDraft = $event.target.value; row.beginnerSaveError = ''" :disabled="row.beginnerSaving" type="number" min="0" :max="Number(row.party_size) - 1" step="1" class="w-16 h-8 rounded-lg border border-line px-2 text-[13px] bg-white" :aria-label="'同行新手人數（不含本人）'"><span class="text-[13px]">位</span></label>
+                      <button v-if="beginnerRowChanged(row)" @click="saveInlineBeginners(row)" :disabled="row.beginnerSaving" class="min-h-0 h-8 px-3 rounded-lg border border-line bg-white text-[13px] font-semibold text-gray-600 disabled:opacity-50">{{ row.beginnerSaving ? '儲存中…' : '儲存' }}</button>
+                    </div>
+                    <div v-if="row.beginnerSaveError" role="alert" class="text-[13px] text-red-600 mt-2">{{ row.beginnerSaveError }}</div>
+                  </div>
                   <div class="flex gap-2">
                     <button v-if="row.financial_status === 'pending'" @click="confirmFinance(row)" class="flex-1 rounded-xl bg-brand-500 text-white font-bold py-2.5">確認收款</button>
                     <button v-if="row.financial_status === 'pending'" @click="openFinanceEdit(row)" class="rounded-xl border border-line bg-white px-4 font-bold text-gray-700">調整</button>
@@ -365,9 +365,9 @@
         <section v-else key="primary">
           <!-- HOME -->
           <div v-if="activeTab === 'home'" class="px-4 py-5">
-            <div class="relative rounded-[20px] bg-gradient-to-br from-brand-500 to-brand-700 text-white p-4 shadow-card">
-              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2 py-1 text-[12px] font-bold tracking-wide">新手友善・多元活動・友善環境</span>
-              <h1 class="text-[24px] font-bold leading-tight mt-2">快速預約、即刻開打！<br>快來揪團加入最夯匹克球！</h1>
+            <div class="relative rounded-[20px] bg-gradient-to-br from-brand-500 to-brand-600 text-white p-4 shadow-card">
+              <span class="inline-flex items-center rounded-full bg-white/15 border border-white/20 px-2 py-1 text-[12px] font-bold tracking-wide">新手友善・多元活動・社交競技</span>
+              <h1 class="text-[24px] font-bold leading-tight mt-2">快速預約、即刻開打！<br>揪團加入最夯匹克之星！</h1>
 
               <div>
                 <div class="flex justify-end">
@@ -396,10 +396,10 @@
                 </div>
 
                 <Transition name="fade">
-                  <div v-if="homeIntroExpanded" class="mt-5 text-[13px] leading-6 text-white/90">
-                    <p class="m-0">運動生活的充電站！🔋 一起享受最 Pickle Star 的生活！🎾</p>
+                  <div v-if="homeIntroExpanded" class="mt-3 text-[14px] leading-6 text-white/90">
+                    <p class="m-0">運動生活的充電站！🔋 一起享受最 Pickle Stars 的生活！🎾</p>
 
-                    <div class="mt-3">
+                    <!-- <div class="mt-3">
                       <div>🔥 競技星球｜挑戰自我，點燃運動魂！</div>
                       <div>💃 社交星球｜以球會友，拓展人脈！</div>
                     </div>
@@ -410,7 +410,12 @@
                     </div>
 
                     <p class="m-0 mt-3">無論運動、交友或放鬆，都能在這裡找到你的熱愛！</p>
-                    <p class="m-0 mt-3 font-semibold">📩 私訊加入 Pickle Star，加入我們一起玩出新生活！</p>
+                    <p class="m-0 mt-3 font-semibold">📩 私訊加入 Pickle Stars，加入我們一起玩出新生活！</p> -->
+                    <div class="mt-3 text-gray rounded-[6px] bg-white/80 py-1 px-3 backdrop-filter-[brightness(1.2) blur(2px)]">
+                      <p class="m-0">新增個人資料的匯款後五碼與新手備註功能</p>
+                      <p class="m-0 mt-2">請報名確定後再匯款，並填寫匯款後五碼或備註給主辦方。</p>
+                    </div>
+                    
                   </div>
                 </Transition>
               </div>
@@ -590,12 +595,12 @@
                   <div>
                     <div class="font-bold text-[16px]">付款與聯絡</div>
                     <p class="text-muted leading-5 mt-0.5 mb-0 text-[13px]">付款後由主辦方人工核對，可接受匯款帳戶、LINE Pay。
+                      <br>匯款前請填寫匯款後五碼，或備註給主辦方您是哪一位，感謝您。
+                      <br>其他問題請聯絡主辦方：louis200630@gmail.com。
                       <br><button @click="openPaymentQr" :disabled="paymentQrLoading" type="button" class="min-h-0 my-2 inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-[14px] font-semibold text-gray-700 disabled:opacity-50">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3h6v6H3zM15 3h6v6h-6zM3 15h6v6H3zM15 15h3v3h3v3h-6zM21 12v3M12 3v3M12 12h3M12 18v3"/></svg>
-                        查看收款 QR Code
-                      </button>
-                      <br>匯款請告知帳號後五碼，或備註給主辦方，感謝您。
-                      <br>聯絡主辦方式：louis200630@gmail.com。</p>
+                        查看國泰收款 QR Code
+                      </button></p>
                   </div>
                 </div>
               </div>
