@@ -213,7 +213,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
           <div class="formgrid">
             <div class="field"><label>我的本場球費</label><input type="number" min="0" step="1" v-model="draft.personal_fee"></div>
             <div class="field"><label>我已繳／套票核銷</label><input type="number" min="0" step="1" v-model="draft.personal_prepaid"></div>
-            <div class="field"><label>分潤／球費特殊說明</label><input disabled value="套票代收與本場現金請在上方「本場收款核對」填寫"></div>
+            
           </div><div class="muted">已買的季票每次使用，可在「我的本場球費」與「我已繳／套票核銷」分別記 380，不會再次要求付款。</div>
         </details>
         <div v-if="error" class="error">{{error}}</div>
