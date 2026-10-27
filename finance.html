@@ -44,7 +44,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
 .notice{border-radius:13px;background:#f0fdf4;border:1px solid #cae8d5;color:#266a41;font-size:12px;line-height:1.7;padding:12px 14px;margin:12px 0}
 .notice.warning{background:#fff9e8;border-color:#f1e1af;color:#805713}.error{border:1px solid #fecaca;background:#fff6f6;color:#991b1b;border-radius:13px;padding:13px;font-size:13px;line-height:1.6;margin-top:10px}
 .auth{padding:32px 20px}.auth h2{margin-bottom:9px;font-size:21px}.field{margin:13px 0}.field label{display:block;color:#526b5c;font-size:12px;font-weight:800;margin-bottom:7px}
-.field input,.field textarea{width:100%;background:#fbfefa;border:1px solid #cfdfd3;border-radius:12px;padding:12px 13px;min-height:46px;outline:none;color:var(--ink)}
+.field input,.field textarea,.field select{width:100%;background:#fbfefa;border:1px solid #cfdfd3;border-radius:12px;padding:12px 13px;min-height:46px;outline:none;color:var(--ink)}
 .field input:focus,.field textarea:focus{border-color:#0f9a6f;box-shadow:0 0 0 3px #b6ecd3}
 .field input[type=number]{font-variant-numeric:tabular-nums}.field textarea{min-height:88px;resize:vertical}
 .formgroup{border-radius:17px;background:#f7fbf8;border:1px solid var(--border);padding:12px 14px;margin:13px 0}
@@ -311,7 +311,8 @@ async function loadIndependent(){
    try{
      const data=await invoke({action:'independent_read'});
      independentItems.value=(data.items||[]).sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.row-a.row);
-    independentLoaded.value=true;
+    independentLoaded.value=data.transfer_supported===true;
+    if(!independentLoaded.value)independentError.value='Google Apps Script 尚未升級 v7，轉交紀錄暫不列入待匯合計。請先部署 v7。';
    }catch(e){independentError.value=e.message||'獨立收款讀取失敗';}finally{independentLoading.value=false;}
  }
  const localToday=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
