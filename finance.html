@@ -123,7 +123,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
         <div class="section-head"><h2>獨立收款紀錄</h2><button class="btn" style="min-height:38px;padding:8px 14px;font-size:12px" @click="newIndependent">＋ 新增紀錄</button></div>
         <div class="notice">每筆系統套票購買可手動確認「待轉交／已轉交／團主直接收款」及轉交日期。只有系統購票 ID 的「待轉交」會加入待匯套票總額；手動混合匯款備忘不重複計入。</div>
         <div class="formgroup"><div class="row between"><b>尚待轉交套票原款</b><b>{{independentLoaded?money(pendingPassTotal):'尚未讀取'}}</b></div><p v-if="unknownPassCount" class="revenue-warn">{{unknownPassCount}} 筆購票尚未確認歸屬，未列入合計，請確認後標示。</p></div>
-        <div v-if="independentError" class="error">{{independentError}}<div class="muted" style="margin-top:7px">若轉交狀態無法讀取或儲存，請先將 Apps Script 更新至 v7。</div></div>
+        <div v-if="independentError" class="error">{{independentError}}<div class="muted" style="margin-top:7px">若轉交狀態無法讀取或儲存，請先將 Apps Script 更新至 v8。</div></div>
         <div v-if="independentLoading" class="center"><div class="spinner"></div>讀取獨立收款紀錄…</div>
         <template v-else>
           <div v-if="!independentItems.length" class="center">目前沒有獨立收款紀錄，點「新增紀錄」開始記帳。</div>
@@ -133,12 +133,12 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
               <div class="row between" style="margin-top:10px"><b style="color:var(--dark);font-size:20px">{{money(m.amount)}}</b><span class="muted">編輯 ↗</span></div>
               <p v-if="m.notes" class="muted" style="margin-top:9px;white-space:pre-wrap;overflow-wrap:anywhere">{{m.notes}}</p>
             </button>
-            <div v-if="m.editable && m.transfer_editable" style="padding:0 16px 13px"><button class="btn secondary" style="font-size:12px;padding:7px 10px;min-height:34px" @click="openTransfer(m)">轉交：{{transferLabel(m.transfer_status)}}{{m.transferred_on?' · '+m.transferred_on:''}}</button></div>
+            <div v-if="m.editable && m.transfer_editable && independentLoaded" style="padding:0 16px 13px"><button class="btn secondary" style="font-size:12px;padding:7px 10px;min-height:34px" @click="openTransfer(m)">轉交：{{transferLabel(m.transfer_status)}}{{m.transferred_on?' · '+m.transferred_on:''}}</button></div>
             <div v-else style="padding:16px">
               <div class="cardtop"><div><div class="date">{{m.date}}</div><div class="venue">{{m.item}}</div></div><span class="pill gray">系統同步・唯讀</span></div>
               <b style="display:block;color:var(--dark);margin-top:10px">{{money(m.amount)}}</b>
               <p v-if="m.notes" class="muted" style="margin-top:9px;white-space:pre-wrap">{{m.notes}}</p>
-              <button v-if="m.transfer_editable" class="btn secondary" style="margin-top:12px;min-height:34px;font-size:12px;padding:7px 10px" @click="openTransfer(m)">轉交：{{transferLabel(m.transfer_status)}}{{m.transferred_on?' · '+m.transferred_on:''}}</button>
+              <button v-if="m.transfer_editable && independentLoaded" class="btn secondary" style="margin-top:12px;min-height:34px;font-size:12px;padding:7px 10px" @click="openTransfer(m)">轉交：{{transferLabel(m.transfer_status)}}{{m.transferred_on?' · '+m.transferred_on:''}}</button>
             </div>
           </div>
         </template>
@@ -210,8 +210,8 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
         <div class="formgroup"><h3>本場收款核對</h3>
           <p class="muted">以前提前轉給團主的球友費直接算進「團主已持有的本場收入」，不重複輸入。整張套票預收款由「收款紀錄」管理，不列入單場營收。</p>
           <div class="formgrid">
-            <div class="field"><label>本次套票轉交抵扣（已核銷部分）</label><input type="number" min="0" step="1" v-model="draft.ticket_transfer_offset"></div>
             <div class="field"><label>我實際代收本場現金</label><input type="number" min="0" step="1" v-model="draft.cash_collected"></div>
+            <div class="field"><label>本次套票轉交抵扣（已核銷部分）</label><input type="number" min="0" step="1" v-model="draft.ticket_transfer_offset"></div>
           </div>
           <div class="row between" style="padding:10px 0 0"><span class="muted">本場收款核對差額</span><b :style="{color:reconcileDiff===0?'var(--primary)':'#b45309'}">{{reconcileDiff===null?'請填入代收現金':money(reconcileDiff)}}</b></div>
           <p class="revenue-foot">差額 = 我仍持有的本場現金 + 團主已持有的本場收入 + 本次套票轉交抵扣 + 團主球費抵扣 − 本場認列收入；整筆套票預收款另行轉交。</p>
@@ -301,6 +301,7 @@ async function load(){
   loading.value=true;error.value='';
   try{
     const data=await invoke({action:'read'});
+    if(Number(data.finance_version)<8){items.value=[];throw new Error('財務同步程式尚未更新至 Apps Script v8。請先部署 v8，再重新整理，以免套票抵扣與核對差額讀錯欄位。');}
     items.value=(data.items||[]).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
     updatedAt.value=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
   }catch(e){error.value=e.message;}finally{loading.value=false;}
