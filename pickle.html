@@ -328,13 +328,13 @@
                 </div>
 
                 <div v-if="row.financial_entry_id && (Number(row.amount || 0) !== 0 || Number(row.package_delta || 0) !== 0 || row.financial_note)" class="mt-4 rounded-2xl bg-gray-50 p-4 data-text border border-solid border-[#e5e5e5]">
-                  <div v-if="Number(row.amount || 0) !== 0" class="flex justify-between gap-4">
-                    <span class="text-muted">金額</span>
-                    <span class="font-semibold">NT$ {{ money(row.amount) }}</span>
-                  </div>
-                  <div v-else-if="Number(row.package_delta || 0) !== 0" class="flex justify-between gap-4">
+                  <div v-if="Number(row.package_delta || 0) !== 0" class="flex justify-between gap-4">
                     <span class="text-muted">套票次數</span>
                     <span class="font-semibold">{{ Math.abs(Number(row.package_delta)) }} 次</span>
+                  </div>
+                  <div v-if="Number(row.amount || 0) !== 0" class="flex justify-between gap-4" :class="Number(row.package_delta || 0) !== 0 ? 'mt-2' : ''">
+                    <span class="text-muted">金額</span>
+                    <span class="font-semibold">NT$ {{ money(row.amount) }}</span>
                   </div>
                   <div v-if="row.financial_note" class="flex justify-between gap-4" :class="(Number(row.amount || 0) !== 0 || Number(row.package_delta || 0) !== 0) ? 'mt-2' : ''">
                     <span class="text-muted">備註</span>
