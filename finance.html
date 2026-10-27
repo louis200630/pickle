@@ -361,7 +361,7 @@ function newIndependent(){
   }catch(e){error.value=e.message||'登入失敗';}finally{working.value=false;}
 }
 async function logout(){await client.auth.signOut();loggedIn.value=false;items.value=[];independentItems.value=[];independentLoaded.value=false;transferEditing.value=null;error.value='';independentError.value='';editing.value=null;independentEditing.value=false;}
-function open(s){editing.value={...s};draft.value=Object.fromEntries(KEYS.map(k=>[k,s[k]??(k==='notes'?'':0)]));original.value={...draft.value};error.value='';syncStatus.value='';}
+function open(s){editing.value={...s};draft.value=Object.fromEntries(KEYS.map(k=>[k,(k==='cash_collected' && s[k]===null)?'':(s[k]??(k==='notes'?'':0))]));original.value={...draft.value};error.value='';syncStatus.value='';}
  async function syncSettledFinance(){
    if(!editing.value||editing.value.status!=='settled'||syncing.value||working.value||hasChanges.value)return;
    const sessionId=editing.value.session_id;
