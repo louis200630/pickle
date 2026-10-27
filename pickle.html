@@ -1318,21 +1318,27 @@
 
     <!-- FINANCE EDIT SHEET -->
     <Transition name="fade">
-      <div v-if="showFinanceEdit" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="showFinanceEdit = false">
+      <div v-if="showFinanceEdit" class="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-end" @click.self="closeFinanceEdit">
         <Transition name="sheet" appear>
           <div class="w-full bg-white rounded-t-[28px] p-5 safe-bottom shadow-float">
-            <div class="flex justify-between items-center"><h2 class="text-[23px] font-bold">調整待確認紀錄</h2><button @click="showFinanceEdit = false" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+            <div class="flex justify-between items-center"><h2 class="text-[23px] font-bold">調整待確認紀錄</h2><button @click="closeFinanceEdit" class="w-11 h-11 min-h-0 rounded-full bg-gray-100 flex items-center justify-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
             <div class="mt-5 flex flex-col gap-4">
-              <div>
-                <label class="font-bold block mb-2">付款方式</label>
-                <div class="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-xl">
-                  <button @click="financeEditForm.method = 'cash'" type="button" class="h-11 min-h-0 rounded-lg font-bold text-[15px]" :class="financeEditForm.method === 'cash' ? 'bg-white shadow-sm text-ink' : 'text-muted'">現金／轉帳</button>
-                  <button @click="financeEditForm.method = 'package'" type="button" class="h-11 min-h-0 rounded-lg font-bold text-[15px]" :class="financeEditForm.method === 'package' ? 'bg-white shadow-sm text-ink' : 'text-muted'">套票</button>
-                </div>
-                <div class="text-[13px] text-muted mt-2">同一筆報名只能選一種付款方式，不能混搭。</div>
+              <div v-if="financeEditError" role="alert" class="rounded-xl bg-red-50 p-3 text-[14px] text-red-700">{{ financeEditError }}</div>
+              <div class="session-form-pair">
+                <div><label for="finance-cash-amount" class="font-bold block mb-2">現金／轉帳金額</label><input id="finance-cash-amount" v-model.number="financeEditForm.amount" @input="refreshFinancePreview" :disabled="adminActionLoading" type="number" min="0" step="1" inputmode="numeric" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+                <div><label for="finance-package-units" class="font-bold block mb-2">套票扣除次數</label><input id="finance-package-units" v-model.number="financeEditForm.packageUnits" @input="refreshFinancePreview" :disabled="adminActionLoading" type="number" min="0" step="1" inputmode="numeric" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               </div>
-              <div v-if="financeEditForm.method === 'cash'"><label class="font-bold block mb-2">金額</label><input v-model.number="financeEditForm.amount" type="number" min="0" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
-              <div v-else><label class="font-bold block mb-2">套票扣除</label><input v-model.number="financeEditForm.packageUnits" type="number" min="1" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
+              <div class="text-[13px] text-muted">可同時使用現金／轉帳與套票，未使用的項目填 0。</div>
+              <div class="rounded-xl border border-line bg-gray-50 p-4 text-[14px]" aria-live="polite">
+                <div v-if="financePreviewLoading" class="text-muted">計算預估收入中…</div>
+                <div v-else-if="financePreviewError" class="text-muted">{{ financePreviewError }}</div>
+                <template v-else-if="financePreview">
+                  <div class="flex justify-between gap-3"><span>現金／轉帳</span><span>NT$ {{ money(financePreview.cash_amount) }}</span></div>
+                  <div class="mt-2 flex justify-between gap-3"><span>套票認列（{{ financePreview.package_units }} 次）</span><span>{{ financePreview.manual_review_units ? '待人工確認' : 'NT$ ' + money(financePreview.package_revenue) }}</span></div>
+                  <div class="mt-3 flex justify-between gap-3 border-t border-line pt-3 font-bold"><span>預估收入合計</span><span>{{ financePreview.total_revenue === null ? '待人工確認' : 'NT$ ' + money(financePreview.total_revenue) }}</span></div>
+                  <p class="mb-0 mt-2 text-[12px] text-muted">依目前套票購買紀錄試算，實際收入以核款後結算結果為準。</p>
+                </template>
+              </div>
               <div><label class="font-bold block mb-2">備註</label><input v-model.trim="financeEditForm.note" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500"></div>
               <button @click="saveFinanceEdit" :disabled="adminActionLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">儲存待確認內容</button>
             </div>
@@ -1576,7 +1582,12 @@
 
       const showFinanceEdit = ref(false);
       const financeEditTarget = ref(null);
-      const financeEditForm = ref({ method: 'cash', amount: 0, packageUnits: 1, note: '' });
+      const financeEditForm = ref({ amount: 0, packageUnits: 0, note: '' });
+      const financeEditError = ref('');
+      const financePreview = ref(null);
+      const financePreviewLoading = ref(false);
+      const financePreviewError = ref('');
+      let financePreviewRequest = 0;
 
       const showCreateSession = ref(false);
       const sessionPhotoFile = ref(null);
@@ -3031,38 +3042,89 @@
         finally { adminActionLoading.value = false; }
       }
 
+      function closeFinanceEdit() {
+        financePreviewRequest += 1;
+        showFinanceEdit.value = false;
+        financePreviewLoading.value = false;
+        financePreview.value = null;
+      }
+
+      function validateFinanceAmounts() {
+        const amount = Number(financeEditForm.value.amount);
+        const units = Number(financeEditForm.value.packageUnits);
+        if (financeEditForm.value.amount === '' || financeEditForm.value.packageUnits === ''
+          || !Number.isInteger(amount) || amount < 0 || amount > 2147483647
+          || !Number.isInteger(units) || units < 0 || units > 2147483647) {
+          throw new Error('金額與套票次數請填寫 0 或正整數');
+        }
+        return { amount, units };
+      }
+
+      async function refreshFinancePreview() {
+        const request = ++financePreviewRequest;
+        const entryId = financeEditTarget.value?.entryId;
+        const userId = user.value?.id;
+        const isCurrent = () => request === financePreviewRequest && showFinanceEdit.value
+          && financeEditTarget.value?.entryId === entryId && user.value?.id === userId;
+        financePreview.value = null;
+        financePreviewError.value = '';
+        financePreviewLoading.value = true;
+        await Vue.nextTick();
+        if (!isCurrent()) return;
+        try {
+          const { amount, units } = validateFinanceAmounts();
+          const { data, error } = await sb.rpc('preview_pending_mixed_payment', {
+            p_entry_id: entryId, p_amount: amount, p_package_units: units
+          });
+          if (!isCurrent()) return;
+          if (error) throw error;
+          if (!data) throw new Error('無法取得收入試算');
+          financePreview.value = data;
+        } catch (e) {
+          if (isCurrent()) financePreviewError.value = friendlyError(e);
+        } finally {
+          if (isCurrent()) financePreviewLoading.value = false;
+        }
+      }
+
       async function openFinanceEdit(row) {
+        if (adminActionLoading.value) return;
         financeEditTarget.value = { ...row, entryId: row.financial_entry_id };
-        const packageDelta = Number(row.package_delta || 0);
         financeEditForm.value = {
-          method: packageDelta < 0 ? 'package' : 'cash',
           amount: Number(row.amount || 0),
-          packageUnits: Math.max(1, Math.abs(packageDelta || Number(row.party_size || 1))),
+          packageUnits: Math.max(0, -Number(row.package_delta || 0)),
           note: row.financial_note || ''
         };
+        financeEditError.value = '';
         showFinanceEdit.value = true;
+        await refreshFinancePreview();
       }
 
       async function saveFinanceEdit() {
-        const method = financeEditForm.value.method;
-        const amount = method === 'cash' ? Math.max(0, Number(financeEditForm.value.amount || 0)) : 0;
-        const packageUnits = Math.max(1, Number(financeEditForm.value.packageUnits || 1));
-        const packageDelta = method === 'package' ? -packageUnits : 0;
-
+        if (adminActionLoading.value || !showFinanceEdit.value) return;
+        financeEditError.value = '';
+        let values;
+        try { values = validateFinanceAmounts(); }
+        catch (e) { financeEditError.value = friendlyError(e); return; }
+        const entryId = financeEditTarget.value.entryId;
+        const userId = user.value?.id;
+        const request = financePreviewRequest;
+        const isCurrent = () => showFinanceEdit.value && financeEditTarget.value?.entryId === entryId
+          && user.value?.id === userId && request === financePreviewRequest;
         adminActionLoading.value = true;
         try {
-          const { error } = await sb.rpc('update_pending_financial_entry', {
-            p_entry_id: financeEditTarget.value.entryId,
-            p_amount: amount,
-            p_package_delta: packageDelta,
-            p_note: financeEditForm.value.note || null
+          const { error } = await sb.rpc('update_pending_mixed_payment', {
+            p_entry_id: entryId, p_amount: values.amount,
+            p_package_delta: -values.units, p_note: financeEditForm.value.note || null
           });
           if (error) throw error;
-          showFinanceEdit.value = false;
+          if (!isCurrent()) return;
+          closeFinanceEdit();
           await refreshAdminDetail();
           showToast('待確認內容已更新');
-        } catch (e) { showToast(friendlyError(e)); }
-        finally { adminActionLoading.value = false; }
+        } catch (e) {
+          if (isCurrent()) financeEditError.value = friendlyError(e);
+        } finally { adminActionLoading.value = false; }
       }
 
       async function cancelCurrentSession() {
@@ -3371,6 +3433,7 @@
         showAccountSettings, accountManageLoading, accountManageError, accountSettingsForm, deleteEligibility,
         showPasswordReset, passwordResetLoading, passwordResetError, passwordResetForm, showResetPassword, showResetPasswordConfirm,
         packagePlans, activePackagePlans, selectedPackagePlanId, showPackagePlans, adminAdjustmentForm, packagePlanForm,
+        closeFinanceEdit, refreshFinancePreview, financeEditError, financePreview, financePreviewLoading, financePreviewError,
         showFinanceEdit, financeEditForm, showCreateSession, sessionForm, sessionPhotoFile, sessionPhotoPreview, timeOptions,
         settledNoteEditing, settledNoteSaving, settledNoteDraft,
         loadMoreAdminPlayerHistory, money, formatDupr, signedUnits, formatDateShort, formatDateLong, formatTimeRange, formatDateTime, formatDeadline,
