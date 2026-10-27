@@ -297,6 +297,7 @@
                     </div>
                     <div v-if="row.original_player !== row.nickname" class="text-[14px] text-muted mt-1">原報名：{{ row.original_player }}</div>
                     <div v-if="row.booked_by && row.booked_by !== row.nickname" class="text-[12px] text-gray-400 mt-1">代報：{{ row.booked_by }}</div>
+                    <div class="text-[12px] text-gray-400 mt-1">匯款後五碼：{{ row.remittance_last_five || '—' }}</div>
                     <div v-if="row.operator" class="text-[12px] text-gray-400 mt-1">審核：{{ row.operator }}</div>
                   </div>
                   <span class="shrink-0 text-[13px] font-bold rounded-full px-2.5 py-1" :class="row.booking_status === 'cancelled' ? 'bg-gray-100 text-gray-500' : (row.financial_status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700')">
@@ -739,6 +740,7 @@
                           <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">金額</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap text-right">套票次數</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap">狀態</th>
+                          <th class="px-3 py-3 font-semibold whitespace-nowrap">匯款後五碼</th>
                           <th class="px-3 py-3 font-semibold whitespace-nowrap">審核</th>
                           <th class="px-3 py-3 font-semibold min-w-[180px]">備註</th>
                         </tr>
@@ -755,6 +757,7 @@
                           <td class="px-3 py-3 text-right font-bold text-ink whitespace-nowrap">NT$ {{ money(row.amount || 0) }}</td>
                           <td class="px-3 py-3 text-right font-medium">{{ signedUnits(row.package_delta) }}</td>
                           <td class="px-3 py-3 whitespace-nowrap">{{ row.status === 'confirmed' ? '已確認' : '待確認' }}</td>
+                          <td class="px-3 py-3 whitespace-nowrap font-medium tabular-nums">{{ row.remittance_last_five || '—' }}</td>
                           <td class="px-3 py-3 whitespace-nowrap text-[13px] text-gray-400">{{ row.operator || '—' }}</td>
                           <td class="px-3 py-3 text-gray-600">{{ row.note || '—' }}<span v-if="row.venue"> · {{ row.venue }}</span></td>
                         </tr>
@@ -989,8 +992,8 @@
                 <label class="font-bold block mb-2">DUPR 分數</label>
                 <input v-model="profileForm.duprRating" type="number" inputmode="decimal" step="0.001" min="2" max="8" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500" placeholder="如果您有DUPR分數請填入此欄位">
               </div>
-<div  class="rounded-2xl border border-line bg-gray-50/70 p-4"><label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="profileForm.remittanceEnabled" class="w-5 h-5 accent-orange-500"><span class="font-bold text-[15px]">設定我的匯款後五碼</span></label><div v-if="profileForm.remittanceEnabled" class="mt-4"><label for="profileForm-last-five" class="block text-[14px] font-semibold mb-2">匯款帳號後五碼</label><input id="profileForm-last-five" v-model="profileForm.remittanceLastFive" @input="profileForm.remittanceLastFive = $event.target.value.replace(/[^0-9]/g, '').slice(0, 5)" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="例如：00123" class="w-full h-[54px] rounded-xl border border-line bg-white px-4 tracking-widest outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-50"><p class="text-[13px] text-muted mt-2 mb-0 leading-5">填寫您常用匯款帳號的後五碼，方便主辦方核對款項。</p></div></div>
-              <button @click="saveProfile" :disabled="profileLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ profileLoading ? '儲存中…' : '儲存資料' }}</button>
+<div  class="rounded-2xl border border-line bg-gray-50/70 p-4"><label class="flex items-center gap-3 cursor-pointer"><input type="checkbox" v-model="profileForm.remittanceEnabled" :disabled="profileLoading || !profileRemittanceReady" class="w-5 h-5 accent-orange-500"><span class="font-bold text-[15px]">設定我的匯款後五碼</span></label><div v-if="profileForm.remittanceEnabled" class="mt-4"><label for="profileForm-last-five" class="block text-[14px] font-semibold mb-2">匯款帳號後五碼</label><input id="profileForm-last-five" v-model="profileForm.remittanceLastFive" :disabled="profileLoading || !profileRemittanceReady" @input="profileForm.remittanceLastFive = $event.target.value.replace(/[^0-9]/g, '').slice(0, 5)" type="text" inputmode="numeric" maxlength="5" autocomplete="off" placeholder="例如：00123" class="w-full h-[54px] rounded-xl border border-line bg-white px-4 tracking-widest outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-50"><p class="text-[13px] text-muted mt-2 mb-0 leading-5">填寫您常用匯款帳號的後五碼，方便主辦方核對款項。</p></div></div>
+              <button @click="saveProfile" :disabled="profileLoading || !profileRemittanceReady" class="w-full rounded-xl bg-brand-500 text-white font-bold py-3.5 disabled:opacity-50">{{ profileLoading ? '儲存中…' : '儲存資料' }}</button>
               <button @click="logout" class="w-full rounded-xl border border-red-200 text-red-600 bg-white font-bold py-3">登出</button>
             </div>
           </div>
@@ -1470,6 +1473,7 @@
 
       const showProfile = ref(false);
       const profileLoading = ref(false);
+      const profileRemittanceReady = ref(false);
       const profileError = ref('');
       const profileForm = ref({ nickname: '', duprRating: '', remittanceEnabled: false, remittanceLastFive: '' });
       const ownPhoneEdit = ref(false);
@@ -2273,7 +2277,7 @@
         if (profile.value?.role !== 'admin') return;
         if (reset) adminFinanceOffset.value = 0;
         const dates = filterDateArgs();
-        const { data, error } = await sb.rpc('search_admin_financial_history', {
+        const { data, error } = await sb.rpc('search_finance_with_remittance', {
           p_from: dates.from,
           p_to: dates.to,
           p_search: financeFilter.value.search || null,
@@ -2293,7 +2297,7 @@
 
       async function exportFinanceCsv() {
         const dates = filterDateArgs();
-        const { data, error } = await sb.rpc('export_admin_financial_history', {
+        const { data, error } = await sb.rpc('export_finance_with_remittance', {
           p_from: dates.from,
           p_to: dates.to,
           p_search: financeFilter.value.search || null
@@ -2301,7 +2305,7 @@
         if (error) { showToast(`匯出失敗：${friendlyError(error)}`); return; }
         const rows = data || [];
         const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-        const header = ['時間','球友','報名人數','套票餘額','金額','套票次數','狀態','審核','備註'];
+        const header = ['時間','球友','報名人數','套票餘額','金額','套票次數','狀態','匯款後五碼','審核','備註'];
         const body = rows.map(r => [
           formatDateTime(r.date_at),
           r.player,
@@ -2310,6 +2314,7 @@
           r.amount ?? 0,
           r.package_units ?? 0,
           r.status,
+          r.remittance_last_five ?? '',
           r.operator ?? '',
           r.note ?? ''
         ].map(esc).join(','));
@@ -2390,7 +2395,8 @@
       }
 
       async function submitAuth() {
-
+        if (authLoading.value) return;
+        let remittanceSaveFailed = false;
         authError.value = '';
         authLoading.value = true;
         try {
@@ -2405,19 +2411,24 @@
             user.value = data.user;
           } else {
             if (!authForm.value.nickname) throw new Error('請輸入球場暱稱');
+            if (authForm.value.remittanceEnabled && !/^[0-9]{5}$/.test(authForm.value.remittanceLastFive)) throw new Error('請輸入完整的 5 位數字');
             const { data, error } = await sb.auth.signUp({ email, password: authForm.value.password });
             if (error) throw error;
             if (!data.session || !data.user) throw new Error('帳號建立後尚未取得登入狀態，請確認 Email confirmations 已關閉');
             user.value = data.user;
             const { error: claimError } = await sb.rpc('claim_player_profile', { p_phone: phone, p_nickname: authForm.value.nickname });
             if (claimError) throw claimError;
+            if (authForm.value.remittanceEnabled) {
+              const { error: remittanceError } = await sb.rpc('set_my_remittance', { p_last_five: authForm.value.remittanceLastFive });
+              remittanceSaveFailed = !!remittanceError;
+            }
           }
 
           await loadProfile();
           showAuth.value = false;
           await loadMyData(true);
           if (profile.value?.role === 'admin') await loadAdminSessions();
-          showToast(authMode.value === 'login' ? '登入成功' : '帳號建立完成，歷史紀錄已同步');
+          showToast(remittanceSaveFailed ? '帳號已建立，匯款後五碼未儲存，請到我的資料重新設定' : (authMode.value === 'login' ? '登入成功' : '帳號建立完成，歷史紀錄已同步'));
         } catch (e) {
           authError.value = readableAuthError(e);
         } finally {
@@ -2640,7 +2651,7 @@
         }
       }
 
-      function openProfile() {
+      async function openProfile() {
         if (!profile.value) return;
         profileError.value = '';
         ownPhoneError.value = '';
@@ -2654,6 +2665,16 @@
           duprRating: profile.value.dupr_rating ?? '', remittanceEnabled: false, remittanceLastFive: ''
         };
         showProfile.value = true;
+        profileRemittanceReady.value = false;
+        profileLoading.value = true;
+        try {
+          const { data, error } = await sb.rpc('get_my_remittance');
+          if (error) throw error;
+          profileForm.value.remittanceEnabled = !!data;
+          profileForm.value.remittanceLastFive = data || '';
+          profileRemittanceReady.value = true;
+        } catch (e) { profileError.value = '匯款資料載入失敗，請關閉後再試一次'; }
+        finally { profileLoading.value = false; }
       }
 
       function toggleOwnPhoneEdit() {
@@ -2766,9 +2787,10 @@
       }
 
       async function saveProfile() {
-profileError.value = '';
-if (profileForm.value.remittanceEnabled && !/^[0-9]{5}$/.test(profileForm.value.remittanceLastFive)) { profileError.value = '請輸入完整的 5 位數字'; return; }
-showToast('樣式預覽完成，尚未送出或儲存資料'); return;
+        if (profileLoading.value) return;
+        if (!profileRemittanceReady.value) { profileError.value = '匯款資料尚未載入，請關閉後再試一次'; return; }
+        profileError.value = '';
+        if (profileForm.value.remittanceEnabled && !/^[0-9]{5}$/.test(profileForm.value.remittanceLastFive)) { profileError.value = '請輸入完整的 5 位數字'; return; }
 
         profileError.value = '';
         profileLoading.value = true;
@@ -2788,8 +2810,9 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
             duprRating = Math.round(duprRating * 1000) / 1000;
           }
 
-          const { error: profileUpdateError } = await sb.rpc('update_my_profile', {
+          const { error: profileUpdateError } = await sb.rpc('update_profile_with_remittance', {
             p_nickname: profileForm.value.nickname,
+            p_last_five: profileForm.value.remittanceEnabled ? profileForm.value.remittanceLastFive : null,
             p_dupr_rating: duprRating
           });
           if (profileUpdateError) throw profileUpdateError;
@@ -2810,7 +2833,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
         settledNoteDraft.value = session.internal_note || '';
         subView.value = 'adminSession';
         adminRosterLoading.value = true;
-        const { data, error } = await sb.rpc('get_admin_roster_with_beginners', { p_session_id: session.session_id });
+        const { data, error } = await sb.rpc('get_admin_roster_with_remittance', { p_session_id: session.session_id });
         adminRosterLoading.value = false;
         if (error) { showToast(friendlyError(error)); return; }
         adminRoster.value = data || [];
@@ -2824,7 +2847,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
           adminSelectedSession.value = updated;
           if (!settledNoteEditing.value) settledNoteDraft.value = updated.internal_note || '';
         }
-        const { data, error } = await sb.rpc('get_admin_roster_with_beginners', { p_session_id: adminSelectedSession.value.session_id });
+        const { data, error } = await sb.rpc('get_admin_roster_with_remittance', { p_session_id: adminSelectedSession.value.session_id });
         if (!error) adminRoster.value = data || [];
       }
 
@@ -3203,7 +3226,7 @@ showToast('樣式預覽完成，尚未送出或儲存資料'); return;
         showBooking, bookingLoading, bookingError, bookingForm,
         recordsMode, recordsLoading, myBookings, myFinance, packageBalance,
         myBookingsHasMore, myFinanceHasMore,
-        showProfile, profileLoading, profileError, profileForm, ownPhoneEdit, ownPhoneLoading, ownPhoneError, ownPhoneForm,
+        showProfile, profileLoading, profileRemittanceReady, profileError, profileForm, ownPhoneEdit, ownPhoneLoading, ownPhoneError, ownPhoneForm,
         ownPasswordEdit, ownPasswordLoading, ownPasswordError, ownPasswordForm,
         showSubstitute, substituteLoading, substituteForm, substituteContext,
         adminMode, adminSessions, adminSessionsHasMore, adminSelectedSession, adminRoster, adminRosterLoading, adminRosterParticipantCount,
