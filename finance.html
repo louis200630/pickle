@@ -28,6 +28,12 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
 .cardtop{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.date{color:var(--muted);font-size:12px;font-weight:600}.venue{font-size:15px;font-weight:800;margin-top:3px}
 .metrics{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;border-top:1px solid #e9f1eb;margin-top:14px;padding-top:12px}
 .metrics small{font-size:10px;color:var(--muted);display:block}.metrics b{font-size:14px;color:var(--dark);margin-top:4px;display:block}
+.revenue-lines{border-top:1px solid #ebf3ed;padding-top:11px;margin-top:13px;display:grid;gap:8px}
+.revenue-lines>div{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;font-size:12px}
+.revenue-lines b{font-variant-numeric:tabular-nums;color:var(--dark);white-space:nowrap}
+.revenue-lines small{font-size:11px;color:var(--muted)}
+.revenue-foot{margin-top:9px;color:var(--muted);font-size:11px;line-height:1.65}
+.revenue-warn{margin-top:9px;color:#9a3412;font-size:12px}
 .btn{border:none;border-radius:13px;padding:12px 15px;min-height:45px;background:var(--primary);color:white;font-weight:800}
 .btn.secondary{background:#e6f5eb;color:var(--primary)}.btn.outline{border:1px solid #bbdac5;background:#fff;color:var(--primary)}
 .row{display:flex;gap:8px;align-items:center}.row.between{justify-content:space-between}.grow{flex:1}
@@ -94,6 +100,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
         <div class="card" v-for="s in items.slice(0,4)" :key="'o'+s.row"><button class="cardbtn" @click="open(s)">
           <div class="cardtop"><div><div class="date">{{s.date}}</div><div class="venue">{{s.venue}}</div></div><span class="pill" :class="{warn:s.status!=='settled'}">{{s.status==='settled'?'已結算':'暫估／未結算'}}</span></div>
           <div class="metrics"><div><small>活動收入</small><b>{{money(s.system_income+s.manual_income)}}</b></div><div><small>盈餘</small><b>{{money(s.profit)}}</b></div><div><small>尚待匯</small><b>{{money(s.due)}}</b></div></div>
+          <div v-if="s.breakdown_ready" class="revenue-foot">現金 {{money(s.cash_income)}} · 季票 {{s.season_units}} 次 {{money(s.season_income)}} · 月票 {{s.monthly_units}} 次 {{money(s.monthly_income)}}</div>
         </button></div>
         <div class="notice">場次「尚待匯」依 Google Sheets 公式顯示，只有正式結算後才視為應付款。套票購買總額不會再次加入場次收入。</div>
       </div>
@@ -104,6 +111,8 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
         <div class="card" v-for="s in filtered" :key="s.row"><button class="cardbtn" @click="open(s)">
           <div class="cardtop"><div><div class="date">{{s.date}}</div><div class="venue">{{s.venue}}</div></div><span class="pill" :class="{warn:s.status!=='settled'}">{{s.status==='settled'?'已結算':'暫估／未結算'}}</span></div>
           <div class="metrics"><div><small>系統收入</small><b>{{money(s.system_income)}}</b></div><div><small>場次盈餘</small><b>{{money(s.profit)}}</b></div><div><small>待匯團主</small><b>{{money(s.due)}}</b></div></div>
+          <div v-if="s.breakdown_ready" class="revenue-foot">現金 {{money(s.cash_income)}} · 季票 {{s.season_units}} 次 {{money(s.season_income)}} · 月票 {{s.monthly_units}} 次 {{money(s.monthly_income)}}</div>
+          <div v-else class="revenue-foot">{{s.status==='settled'?'正式場次尚未同步收入分類，請重新同步財務報表':'目前為 Sheets 舊暫估資料，結算前可能與即時報名不同'}}</div>
         </button></div>
         <div v-if="!filtered.length" class="center">目前沒有符合條件的場次。</div>
       </div>
@@ -144,6 +153,20 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
       <div class="sheetbar"><div><b>{{editing.date}}｜{{editing.venue}}</b><div class="muted">{{editing.status==='settled'?'已結算':'未結算・目前為暫估'}}</div></div><button aria-label="關閉" @click="editing=null">×</button></div>
       <div class="bigsum"><span>尚需匯團主（Google Sheets 計算）</span><b>{{money(editing.due)}}</b></div>
       <div class="row between" style="padding:0 1px 5px"><span class="muted">系統自動收入</span><b>{{money(editing.system_income)}}</b></div>
+      <div v-if="editing.breakdown_ready" class="formgroup">
+        <h3>場次收入組成（正式同步）</h3>
+        <div class="revenue-lines">
+          <div><span>現金／轉帳認列</span><b>{{money(editing.cash_income)}}</b></div>
+          <div><span>季票核銷 <small>（{{editing.season_units}} 次）</small></span><b>{{money(editing.season_income)}}</b></div>
+          <div><span>月票核銷 <small>（{{editing.monthly_units}} 次）</small></span><b>{{money(editing.monthly_income)}}</b></div>
+          <div v-if="editing.other_package_income"><span>其他／舊版套票</span><b>{{money(editing.other_package_income)}}</b></div>
+          <div v-if="editing.manual_review_units"><span>待人工確認套票</span><b>{{editing.manual_review_units}} 次</b></div>
+          <div><strong>系統認列合計</strong><b>{{money(editing.cash_income+editing.season_income+editing.monthly_income+editing.other_package_income)}}</b></div>
+        </div>
+        <p class="revenue-foot">季票與月票按原始購票金額分攤；購買套票的整筆預付款不會再重複計入本場。</p>
+        <p v-if="editing.income_difference!==null && editing.income_difference!==0" class="revenue-warn">收入檢核差額：{{money(editing.income_difference)}}，請先核對。</p>
+      </div>
+      <div v-else class="notice warning">尚無系統同步的收入分類。{{editing.status==='settled'?'請確認 Apps Script v5 已部署，再從正式管理後台執行「重新同步財務報表」。':'本場未結算，Sheets 可能是舊暫估金額，勿當成當下真實收入。'}}</div>
       <div v-if="editing.status!=='settled'" class="notice warning">此場尚未正式結算，現在的收入與盈餘只是暫估，請不要直接把待匯金額當成已結清款。</div>
       <form @submit.prevent="save">
         <div class="formgroup"><h3>本場收入與成本</h3><p class="muted">手動欄位更新後，Google Sheets 會重算盈餘。</p>
