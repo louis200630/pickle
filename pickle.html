@@ -620,7 +620,7 @@
                 <button @click="openAdminFinance" class="min-h-0 h-11 rounded-lg font-bold text-[14px]" :class="adminMode === 'finance' ? 'bg-white shadow-sm' : 'text-muted'">財務</button>
               </div>
 
-              <div v-if="adminMode === 'sessions'" class="mt-4 flex flex-col gap-4">
+              <div v-if="adminMode === 'sessions'" class="desktop-card-grid mt-4 gap-4">
                 <article v-for="session in adminSessions" :key="session.session_id" class="glass-surface rounded-[22px] border border-white/60 shadow-card p-5">
                   <div class="flex justify-between gap-4 items-start">
                     <div>
@@ -650,8 +650,8 @@
                       : 'border-brand-200 bg-brand-50 text-brand-700'"
                   >{{ ['settled','cancelled'].includes(session.status) ? '檢視名單' : '檢視與處理名單' }}</button>
                 </article>
-                <div v-if="adminSessions.length === 0" class="rounded-[22px] border border-dashed border-gray-300 bg-white p-10 text-center text-muted">目前沒有場次</div>
-                <button v-if="adminSessionsHasMore" @click="loadMoreAdminSessions" class="w-full rounded-xl border border-line bg-white font-bold py-3">顯示更多場次</button>
+                <div v-if="adminSessions.length === 0" class="desktop-grid-full rounded-[22px] border border-dashed border-gray-300 bg-white p-10 text-center text-muted">目前沒有場次</div>
+                <button v-if="adminSessionsHasMore" @click="loadMoreAdminSessions" class="desktop-grid-full w-full rounded-xl border border-line bg-white font-bold py-3">顯示更多場次</button>
               </div>
 
               <div v-else-if="adminMode === 'players'" class="mt-4">
