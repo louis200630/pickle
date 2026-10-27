@@ -791,7 +791,7 @@
                           <td class="px-3 py-3 text-right font-medium">{{ row.package_balance_after ?? '—' }}</td>
                           <td class="px-3 py-3 text-right font-bold text-ink whitespace-nowrap">NT$ {{ money(row.amount || 0) }}</td>
                           <td class="px-3 py-3 text-right font-medium">{{ signedUnits(row.package_delta) }}</td>
-                          <td class="px-3 py-3 whitespace-nowrap"><span :class="row.status === 'pending' ? 'inline-flex items-center rounded-lg border border-brand-100 bg-brand-50 px-2 py-1 text-[13px] font-bold text-brand-700' : ''">{{ row.status === 'confirmed' ? '已確認' : '待確認' }}</span></td>
+                          <td class="px-3 py-3 whitespace-nowrap"><span :class="row.status === 'pending' ? 'text-brand-700' : ''">{{ row.status === 'confirmed' ? '已確認' : '待確認' }}</span></td>
                           <td class="px-3 py-3 whitespace-nowrap font-medium tabular-nums">{{ row.remittance_last_five || '—' }}</td>
                           <td class="px-3 py-3 whitespace-nowrap text-[13px] text-gray-400">{{ row.operator || '—' }}</td>
                           <td class="px-3 py-3 text-gray-600">{{ row.note || '—' }}<span v-if="row.venue"> · {{ row.venue }}</span></td>
