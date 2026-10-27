@@ -90,16 +90,17 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
       <div v-if="tab==='overview'">
         <div class="section-head"><h2>財務總覽</h2><span class="pill">Google Sheets 同步</span></div>
         <div class="grid">
-          <div class="kpi accent"><div class="label">已結算待匯團主</div><div class="amount">{{money(totals.due)}}</div><div class="hint">未完成結算不列入</div></div>
+          <div class="kpi accent"><div class="label">已同步待匯團主</div><div class="amount">{{money(totals.due)}}</div><div class="hint">只計已結算且明細同步完成</div></div>
           <div class="kpi"><div class="label">已結算場次盈餘</div><div class="amount">{{money(totals.profit)}}</div><div class="hint">不含暫估場次</div></div>
           <div class="kpi"><div class="label">已匯團主</div><div class="amount">{{money(totals.paid)}}</div><div class="hint">已登記匯出款項</div></div>
           <div class="kpi"><div class="label">已結算活動收入</div><div class="amount">{{money(totals.revenue)}}</div><div class="hint">含已使用套票認列</div></div>
         </div>
+        <div v-if="items.some(s=>s.status==='settled' && !s.breakdown_ready)" class="notice warning">部分已結算場次尚未同步收入分類。為避免顯示舊金額，這些場次暫不計入上方總覽；請部署 Apps Script v5 後重新同步。</div>
         <div class="section-head"><h2>最近場次</h2><button class="btn secondary" style="font-size:12px;min-height:35px;padding:7px 12px" @click="tab='sessions'">查看全部</button></div>
         <div v-if="!items.length" class="center">還沒有場次帳務資料。</div>
         <div class="card" v-for="s in items.slice(0,4)" :key="'o'+s.row"><button class="cardbtn" @click="open(s)">
           <div class="cardtop"><div><div class="date">{{s.date}}</div><div class="venue">{{s.venue}}</div></div><span class="pill" :class="{warn:s.status!=='settled'}">{{s.status==='settled'?'已結算':'暫估／未結算'}}</span></div>
-          <div class="metrics"><div><small>活動收入</small><b>{{money(s.system_income+s.manual_income)}}</b></div><div><small>盈餘</small><b>{{money(s.profit)}}</b></div><div><small>尚待匯</small><b>{{money(s.due)}}</b></div></div>
+          <div class="metrics"><div><small>活動收入</small><b>{{s.status==='settled'&&!s.breakdown_ready?'待同步':money(s.system_income+s.manual_income)}}</b></div><div><small>盈餘</small><b>{{s.status==='settled'&&!s.breakdown_ready?'待同步':money(s.profit)}}</b></div><div><small>尚待匯</small><b>{{s.status==='settled'&&!s.breakdown_ready?'待同步':money(s.due)}}</b></div></div>
           <div v-if="s.breakdown_ready" class="revenue-foot">現金 {{money(s.cash_income)}} · 季票 {{s.season_units}} 次 {{money(s.season_income)}} · 月票 {{s.monthly_units}} 次 {{money(s.monthly_income)}}</div>
         </button></div>
         <div class="notice">場次「尚待匯」依 Google Sheets 公式顯示，只有正式結算後才視為應付款。套票購買總額不會再次加入場次收入。</div>
@@ -110,7 +111,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
         <div class="notice" v-if="tab==='transfers'">只要打開場次，填入「本次已匯團主」（累計匯款額），儲存後待匯金額會由試算表自動重新計算。</div>
         <div class="card" v-for="s in filtered" :key="s.row"><button class="cardbtn" @click="open(s)">
           <div class="cardtop"><div><div class="date">{{s.date}}</div><div class="venue">{{s.venue}}</div></div><span class="pill" :class="{warn:s.status!=='settled'}">{{s.status==='settled'?'已結算':'暫估／未結算'}}</span></div>
-          <div class="metrics"><div><small>系統收入</small><b>{{money(s.system_income)}}</b></div><div><small>場次盈餘</small><b>{{money(s.profit)}}</b></div><div><small>待匯團主</small><b>{{money(s.due)}}</b></div></div>
+          <div class="metrics"><div><small>系統收入</small><b>{{s.status==='settled'&&!s.breakdown_ready?'待同步':money(s.system_income)}}</b></div><div><small>場次盈餘</small><b>{{s.status==='settled'&&!s.breakdown_ready?'待同步':money(s.profit)}}</b></div><div><small>待匯團主</small><b>{{s.status==='settled'&&!s.breakdown_ready?'待同步':money(s.due)}}</b></div></div>
           <div v-if="s.breakdown_ready" class="revenue-foot">現金 {{money(s.cash_income)}} · 季票 {{s.season_units}} 次 {{money(s.season_income)}} · 月票 {{s.monthly_units}} 次 {{money(s.monthly_income)}}</div>
           <div v-else class="revenue-foot">{{s.status==='settled'?'正式場次尚未同步收入分類，請重新同步財務報表':'目前為 Sheets 舊暫估資料，結算前可能與即時報名不同'}}</div>
         </button></div>
@@ -231,7 +232,7 @@ const editing=ref(null),draft=ref({}),original=ref({});
  const memoDraft=ref({date:'',item:'',amount:'',notes:''}),memoOriginal=ref(null);
 const money=v=>'NT$'+fmt.format(Number(v||0));
 const filtered=computed(()=>items.value.filter(s=>tab.value==='transfers'?(s.status==='settled'&&s.due>0):filter.value==='all'?true:filter.value==='settled'?s.status==='settled':s.status!=='settled'));
-const totals=computed(()=>items.value.filter(s=>s.status==='settled').reduce((a,s)=>{a.due+=Number(s.due||0);a.profit+=Number(s.profit||0);a.paid+=Number(s.paid_organizer||0);a.revenue+=Number(s.system_income||0)+Number(s.manual_income||0);return a;},{due:0,profit:0,paid:0,revenue:0}));
+const totals=computed(()=>items.value.filter(s=>s.status==='settled' && s.breakdown_ready && s.income_difference===0).reduce((a,s)=>{a.due+=Number(s.due||0);a.profit+=Number(s.profit||0);a.paid+=Number(s.paid_organizer||0);a.revenue+=Number(s.system_income||0)+Number(s.manual_income||0);return a;},{due:0,profit:0,paid:0,revenue:0}));
 const hasChanges=computed(()=>KEYS.some(k=>String(draft.value[k]??'')!==String(original.value[k]??'')));
  const independentCanSave=computed(()=>!!memoDraft.value.date && !!String(memoDraft.value.item||'').trim() &&
   memoDraft.value.amount!=='' && Number.isSafeInteger(Number(memoDraft.value.amount)) && Number(memoDraft.value.amount)>=0 &&
