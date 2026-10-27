@@ -242,7 +242,7 @@ button.ghost{border:1px solid #ffffff66;background:#ffffff16;border-radius:12px;
 const SUPABASE_URL='https://bpaxiozotebbkycwjsup.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_XYOLSLzLlIjiRcKZOSJnZQ_3nHIeHTg';
 const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-const KEYS=['manual_income','venue_cost','extra_cost','notes','organizer_advance','paid_organizer','personal_fee','personal_prepaid','organizer_holds','organizer_fee_offset','cash_collected','organizer_early_income','self_ticket_recognized','pass_cash_held'];
+const KEYS=['manual_income','venue_cost','extra_cost','notes','organizer_advance','paid_organizer','personal_fee','personal_prepaid','organizer_holds','organizer_fee_offset','cash_collected','ticket_transfer_offset'];
 const fmt=new Intl.NumberFormat('zh-TW',{maximumFractionDigits:0});
 function parsePhone(raw){let d=String(raw||'').replace(/\D/g,'');if(d.startsWith('886'))d=(d.slice(3).startsWith('0')?'':'0')+d.slice(3);else if(d.length===9&&d.startsWith('9'))d='0'+d;if(!/^09\d{8}$/.test(d))throw Error('請輸入有效的台灣手機號碼');return d;}
 const {createApp,ref,computed,onMounted}=Vue;
@@ -251,16 +251,19 @@ setup(){
 const booting=ref(true),loggedIn=ref(false),loading=ref(false),working=ref(false),syncing=ref(false),syncStatus=ref(''),error=ref('');
 const phone=ref(''),password=ref(''),tab=ref('overview'),filter=ref('all'),items=ref([]),updatedAt=ref('');
 const editing=ref(null),draft=ref({}),original=ref({});
- const independentItems=ref([]),independentLoading=ref(false),independentError=ref(''),independentEditing=ref(false);
+ const independentItems=ref([]),independentLoading=ref(false),independentLoaded=ref(false),independentError=ref(''),independentEditing=ref(false),transferEditing=ref(null),transferDraft=ref({status:'',date:''});
  const memoDraft=ref({date:'',item:'',amount:'',notes:''}),memoOriginal=ref(null);
 const money=v=>'NT$'+fmt.format(Number(v||0));
+const pendingPassTotal=computed(()=>independentItems.value.filter(x=>x.origin==='system'&&x.transfer_status==='pending').reduce((v,x)=>v+Number(x.amount||0),0));
+const unknownPassCount=computed(()=>independentItems.value.filter(x=>x.origin==='system'&&!x.transfer_status).length);
+const transferLabel=s=>({pending:'待轉交',transferred:'已轉交團主',direct:'團主直接收款'})[s]||'尚未確認';
 const filtered=computed(()=>items.value.filter(s=>tab.value==='transfers'?(s.status==='settled'&&s.due>0):filter.value==='all'?true:filter.value==='settled'?s.status==='settled':s.status!=='settled'));
 const totals=computed(()=>items.value.filter(s=>s.status==='settled' && s.breakdown_ready && s.income_difference===0).reduce((a,s)=>{a.due+=Number(s.due||0);a.profit+=Number(s.profit||0);a.paid+=Number(s.paid_organizer||0);a.revenue+=Number(s.system_income||0)+Number(s.manual_income||0);return a;},{due:0,profit:0,paid:0,revenue:0}));
 const hasChanges=computed(()=>KEYS.some(k=>String(draft.value[k]??'')!==String(original.value[k]??'')));
  const reconcileDiff=computed(()=>{
    if(!editing.value || draft.value.cash_collected==='' || draft.value.cash_collected===null) return null;
    const n=k=>Number(draft.value[k]||0);
-   return n('cash_collected')+n('organizer_holds')+n('organizer_fee_offset')+n('organizer_early_income')+n('self_ticket_recognized')-Number(editing.value.system_income||0)-n('manual_income');
+   return n('cash_collected')+n('organizer_holds')+n('organizer_fee_offset')+n('ticket_transfer_offset')-Number(editing.value.system_income||0)-n('manual_income');
  });
  const independentCanSave=computed(()=>!!memoDraft.value.date && !!String(memoDraft.value.item||'').trim() &&
   memoDraft.value.amount!=='' && Number.isSafeInteger(Number(memoDraft.value.amount)) && Number(memoDraft.value.amount)>=0 &&
@@ -288,10 +291,22 @@ async function loadIndependent(){
    try{
      const data=await invoke({action:'independent_read'});
      independentItems.value=(data.items||[]).sort((a,b)=>String(b.date).localeCompare(String(a.date))||b.row-a.row);
+    independentLoaded.value=true;
    }catch(e){independentError.value=e.message||'獨立收款讀取失敗';}finally{independentLoading.value=false;}
  }
  const localToday=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
- function newIndependent(){
+ function openTransfer(m){if(!m.transfer_editable)return;independentError.value='';transferEditing.value={...m};transferDraft.value={status:m.transfer_status||'',date:m.transferred_on||''};}
+async function saveTransfer(){
+ if(!transferEditing.value)return;
+ const m=transferEditing.value,st=transferDraft.value.status||'',date=st==='transferred'?transferDraft.value.date:'';
+ if(st==='transferred'&&!/^\d{4}-\d{2}-\d{2}$/.test(date)){independentError.value='請填實際轉交日期';return;}
+ working.value=true;independentError.value='';
+ try{await invoke({action:'transfer_save',entry_id:m.id,transfer_status:st,transferred_on:date,original_status:m.transfer_status||'',original_date:m.transferred_on||''});
+   transferEditing.value=null;await loadIndependent();}
+ catch(e){independentError.value=e.message||'轉交狀態未能儲存';}
+ finally{working.value=false;}
+}
+function newIndependent(){
    independentError.value='';
    memoOriginal.value=null;memoDraft.value={date:localToday(),item:'',amount:'',notes:''};independentEditing.value=true;
  }
@@ -321,10 +336,10 @@ async function loadIndependent(){
   try{const email=parsePhone(phone.value)+'@pickle.example.com';
     const {error:authError}=await client.auth.signInWithPassword({email,password:password.value});
     if(authError)throw authError;loggedIn.value=true;password.value='';await load();
-    if(error.value.includes('權限')){await client.auth.signOut();loggedIn.value=false;}
+    if(error.value.includes('權限')){await client.auth.signOut();loggedIn.value=false;}else await loadIndependent();
   }catch(e){error.value=e.message||'登入失敗';}finally{working.value=false;}
 }
-async function logout(){await client.auth.signOut();loggedIn.value=false;items.value=[];independentItems.value=[];error.value='';independentError.value='';editing.value=null;independentEditing.value=false;}
+async function logout(){await client.auth.signOut();loggedIn.value=false;items.value=[];independentItems.value=[];independentLoaded.value=false;transferEditing.value=null;error.value='';independentError.value='';editing.value=null;independentEditing.value=false;}
 function open(s){editing.value={...s};draft.value=Object.fromEntries(KEYS.map(k=>[k,s[k]??(k==='notes'?'':0)]));original.value={...draft.value};error.value='';syncStatus.value='';}
  async function syncSettledFinance(){
    if(!editing.value||editing.value.status!=='settled'||syncing.value||working.value||hasChanges.value)return;
@@ -354,9 +369,9 @@ async function save(){
 onMounted(async()=>{
   try{const {data:{session}}=await client.auth.getSession();loggedIn.value=!!session?.user;}
   catch(e){error.value='請重新登入';}
-  booting.value=false;if(loggedIn.value)await load();
+  booting.value=false;if(loggedIn.value){await load();await loadIndependent();}
 });
-return {booting,loggedIn,loading,working,syncing,syncStatus,error,phone,password,tab,filter,items,updatedAt,editing,draft,original,filtered,totals,money,hasChanges,reconcileDiff,load,login,logout,open,save,syncSettledFinance,independentItems,independentLoading,independentError,independentEditing,memoDraft,memoOriginal,independentCanSave,loadIndependent,newIndependent,editIndependent,saveIndependent};
+return {booting,loggedIn,loading,working,syncing,syncStatus,error,phone,password,tab,filter,items,updatedAt,editing,draft,original,filtered,totals,money,hasChanges,reconcileDiff,pendingPassTotal,unknownPassCount,independentLoaded,transferLabel,transferEditing,transferDraft,openTransfer,saveTransfer,load,login,logout,open,save,syncSettledFinance,independentItems,independentLoading,independentError,independentEditing,memoDraft,memoOriginal,independentCanSave,loadIndependent,newIndependent,editIndependent,saveIndependent};
 }
 }).mount('#finance-app');
 })();
