@@ -361,6 +361,42 @@
                     <button v-if="row.financial_status === 'pending'" @click="openFinanceEdit(row)" class="rounded-xl border border-line bg-white px-4 font-bold text-gray-700">調整</button>
                     <button v-if="row.financial_status === 'confirmed'" @click="reopenFinance(row)" class="w-full rounded-xl border border-line bg-white text-gray-700 font-bold py-2.5">改回待確認</button>
                   </div>
+                  <div class="mt-3 rounded-2xl border border-orange-100 bg-[#FFF9F3] p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <div><div class="font-bold text-[15px]">團體報名人數</div><div class="text-[14px] text-gray-600 mt-1">目前 {{ row.party_size }} 位（含參加者）</div></div>
+                      <button v-if="row.financial_status === 'pending'" type="button" @click="toggleAdminPartyEdit(row)" :disabled="row.partySaving || adminActionLoading" class="rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-[14px] font-bold text-brand-700 disabled:opacity-50">{{ row.partyEditing ? '收合' : '調整人數' }}</button>
+                    </div>
+                    <div v-if="row.financial_status !== 'pending'" class="mt-2 text-[14px] leading-relaxed text-gray-600">此報名已確認收款或套票，為避免影響帳務，目前不開放直接變更人數。</div>
+                    <div v-if="row.partyEditing && row.financial_status === 'pending'" class="mt-4 border-t border-orange-100 pt-4 space-y-4">
+                      <div class="flex items-center justify-between gap-2">
+                        <div><div class="font-semibold text-[15px]">調整後總人數</div><div class="text-[14px] text-gray-500">含本人與同行者</div></div>
+                        <div class="flex items-center gap-2">
+                          <button type="button" @click="changeAdminPartySize(row,-1)" :disabled="row.partySaving || Number(row.partySizeDraft) <= 1" class="h-10 w-10 rounded-xl border border-line bg-white text-[20px] font-bold disabled:opacity-40">−</button>
+                          <span class="w-7 text-center text-[20px] font-bold">{{ row.partySizeDraft }}</span>
+                          <button type="button" @click="changeAdminPartySize(row,1)" :disabled="row.partySaving || Number(row.partySizeDraft) >= Math.max(1,Number(adminSelectedSession.capacity)-(Number(adminSelectedSession.registered_count)-Number(row.party_size)))" class="h-10 w-10 rounded-xl border border-line bg-white text-[20px] font-bold disabled:opacity-40">＋</button>
+                        </div>
+                      </div>
+                      <label class="inline-flex items-center gap-2 text-[15px] font-medium"><input v-model="row.partyIsBeginnerDraft" type="checkbox" :disabled="row.partySaving" class="h-4 w-4 accent-orange-500">參加者是新手</label>
+                      <div class="flex items-center justify-between gap-3">
+                        <label class="text-[14px] font-semibold">同行新手人數</label>
+                        <input v-model.number="row.partyCompanionDraft" type="number" min="0" :max="Number(row.partySizeDraft)-1" step="1" :disabled="row.partySaving" class="h-11 w-20 rounded-lg border border-line bg-white px-3 text-[16px]" aria-label="同行新手人數">
+                      </div>
+                      <div class="grid grid-cols-2 gap-3">
+                        <label class="text-[14px] font-semibold">待確認金額（NT$）
+                          <input v-model.number="row.partyAmountDraft" type="number" min="0" step="1" inputmode="numeric" :disabled="row.partySaving" class="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[16px]">
+                        </label>
+                        <label class="text-[14px] font-semibold">預留套票次數
+                          <input v-model.number="row.partyUnitsDraft" type="number" min="0" :max="Number(row.partySizeDraft)*Number(adminSelectedSession.default_package_units||0)" step="1" inputmode="numeric" :disabled="row.partySaving" class="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[16px]">
+                        </label>
+                      </div>
+                      <div class="rounded-xl bg-white border border-orange-100 px-3 py-2 text-[14px] leading-relaxed text-gray-600">人數變動會預填建議金額，請核對金額與套票次數後再儲存。付款仍維持待確認，不會自動收款。</div>
+                      <div v-if="row.partySaveError" role="alert" class="rounded-xl bg-red-50 px-3 py-2 text-[14px] text-red-700">{{ row.partySaveError }}</div>
+                      <div class="flex gap-2">
+                        <button type="button" @click="toggleAdminPartyEdit(row)" :disabled="row.partySaving" class="flex-1 rounded-xl border border-line bg-white py-2.5 text-[15px] font-bold">取消</button>
+                        <button type="button" @click="saveAdminPartySize(row)" :disabled="row.partySaving" class="flex-1 rounded-xl bg-brand-500 py-2.5 text-[15px] font-bold text-white disabled:opacity-50">{{ row.partySaving ? '儲存中…' : '儲存調整' }}</button>
+                      </div>
+                    </div>
+                  </div>
                   <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-100">
                     <button @click="openAdminSubstitute(row)" class="rounded-xl border border-line bg-white text-gray-700 font-bold py-2.5 flex items-center justify-center gap-2">
                       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
