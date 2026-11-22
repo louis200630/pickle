@@ -948,7 +948,7 @@
                 <label class="font-bold block mb-2">參加者手機</label>
                 <input v-model.trim="bookingForm.phone" :readonly="bookingForm.mode === 'self'" type="tel" inputmode="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50">
                 <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px] font-semibold text-gray-600" role="group" aria-label="報名設定">
-                  <label v-if="bookingForm.mode === 'self'" class="inline-flex items-center gap-2 cursor-pointer select-none">
+                  <label class="inline-flex items-center gap-2 cursor-pointer select-none">
                     <input v-model="bookingForm.group" @change="toggleGroupBooking" :disabled="Number(selectedSession?.remaining_spots || 0) < 2" type="checkbox" class="w-4 h-4 accent-orange-500">
                     <span>團體報名</span>
                   </label>
@@ -956,15 +956,15 @@
                     <input v-model="bookingForm.isBeginner" type="checkbox" class="w-4 h-4 accent-orange-500">
                     <span>{{ bookingForm.mode === 'self' ? '我是新手' : '參加者是新手' }}</span>
                   </label>
-                  <span v-if="bookingForm.mode === 'self' && Number(selectedSession?.remaining_spots || 0) < 2" class="text-[12px] font-normal text-gray-400">剩餘名額不足，無法團體報名</span>
+                  <span v-if="Number(selectedSession?.remaining_spots || 0) < 2" class="text-[12px] font-normal text-gray-400">剩餘名額不足，無法團體報名</span>
                 </div>
               </div>
 
-              <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
+              <div v-if="bookingForm.group" class="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
                 <div class="flex items-center justify-between gap-4">
                   <div>
                     <div class="font-bold">報名人數</div>
-                    <div class="text-[13px] text-muted mt-1">包含本人，共 {{ bookingForm.partySize }} 位</div>
+                    <div class="text-[13px] text-muted mt-1">包含參加者，共 {{ bookingForm.partySize }} 位</div>
                   </div>
                   <div class="flex items-center gap-3">
                     <button @click="adjustPartySize(-1)" :disabled="bookingForm.partySize <= 2" type="button" class="w-10 h-10 min-h-0 rounded-xl bg-white border border-line font-bold text-[20px] disabled:opacity-35">−</button>
@@ -977,10 +977,10 @@
                 </div>
               </div>
 
-              <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="text-[14px] text-gray-600">
+              <div v-if="bookingForm.group" class="text-[14px] text-gray-600">
                 <div class="flex items-center justify-between gap-3"><label for="booking-companions">同行新手人數（不含本人）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line bg-white px-3"></div>
               </div>
-              <button @click="submitBooking" :disabled="bookingLoading || bookingAvailabilityLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingAvailabilityLoading ? '更新名額中…' : (bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名')) }}</button>
+              <button @click="submitBooking" :disabled="bookingLoading || bookingAvailabilityLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingAvailabilityLoading ? '更新名額中…' : (bookingLoading ? '送出中…' : (bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名')) }}</button>
             </div>
           </div>
         </Transition>
@@ -1655,7 +1655,8 @@
           [/Capacity cannot be lower than the current active booking count|Capacity cannot be lower than the current active participant count/i, '人數上限不能少於目前已報名人數'],
           [/Not enough remaining spots for this party size/i, '剩餘名額不足，請減少團體報名人數'],
           [/Party size must be at least 1/i, '報名人數至少需要 1 位'],
-          [/Group booking is only available for self booking/i, '團體報名僅限本人報名使用'],
+          [/此功能用於幫朋友團體報名/i, '如需替自己團體報名，請切換至「我自己」'],
+          [/Group booking is only available for self booking/i, '此場次目前無法幫朋友進行團體報名'],
           [/Booking payment must use either cash or package units, not both/i, '付款與套票只能選擇一種，不能混搭'],
           [/Booking package payment cannot add package units/i, '場次付款只能扣除套票，不能增加套票'],
           [/Default price cannot be negative/i, '單次費用不能小於 0'],
@@ -2602,7 +2603,7 @@
           const nickname = bookingForm.value.nickname;
           if (!nickname) throw new Error('請輸入參加者暱稱');
           const phone = normalizePhone(bookingForm.value.phone);
-          const group = bookingForm.value.mode === 'self' && bookingForm.value.group;
+          const group = Boolean(bookingForm.value.group);
           const partySize = group ? Math.max(2, Number(bookingForm.value.partySize || 2)) : 1;
           const companionBeginners = group ? Number(bookingForm.value.companionBeginners) : 0;
           const isBeginner = Boolean(bookingForm.value.isBeginner);
@@ -2613,7 +2614,8 @@
           // Refresh this exact session; the booking RPC makes the final capacity decision.
           applySessionAvailability(await fetchSessionAvailability(sessionId));
           attemptedBooking = true;
-          const { error } = await sb.rpc('create_booking_with_beginners', {
+          const bookingRpc = !selfBooking && group ? 'create_friend_group_booking_test' : 'create_booking_with_beginners';
+          const { error } = await sb.rpc(bookingRpc, {
             p_session_id: sessionId,
             p_phone: phone,
             p_nickname: nickname,
@@ -2629,7 +2631,7 @@
             const roster = await sb.rpc('get_public_roster_with_beginners', { p_session_id: sessionId });
             if (!roster.error) publicRoster.value = roster.data || [];
           }
-          showToast(selfBooking ? '報名成功，等待主辦方確認收款' : '已成功幫朋友報名');
+          showToast(selfBooking ? '報名成功，等待主辦方確認收款' : (group ? `已成功幫朋友報名 ${partySize} 位，等待主辦方確認收款` : '已成功幫朋友報名'));
         } catch (e) {
           // Preserve the original rejection and entered form even if refreshing fails.
           if (attemptedBooking) {
