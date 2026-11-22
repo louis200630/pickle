@@ -361,6 +361,42 @@
                     <button v-if="row.financial_status === 'pending'" @click="openFinanceEdit(row)" class="rounded-xl border border-line bg-white px-4 font-bold text-gray-700">調整</button>
                     <button v-if="row.financial_status === 'confirmed'" @click="reopenFinance(row)" class="w-full rounded-xl border border-line bg-white text-gray-700 font-bold py-2.5">改回待確認</button>
                   </div>
+                  <div class="mt-3 rounded-2xl border border-orange-100 bg-[#FFF9F3] p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                      <div><div class="font-bold text-[15px]">團體報名人數</div><div class="text-[14px] text-gray-600 mt-1">目前 {{ row.party_size }} 位（含參加者）</div></div>
+                      <button v-if="row.financial_status === 'pending'" type="button" @click="toggleAdminPartyEdit(row)" :disabled="row.partySaving || adminActionLoading" class="rounded-xl border border-orange-200 bg-white px-4 py-2.5 text-[14px] font-bold text-brand-700 disabled:opacity-50">{{ row.partyEditing ? '收合' : '調整人數' }}</button>
+                    </div>
+                    <div v-if="row.financial_status !== 'pending'" class="mt-2 text-[14px] leading-relaxed text-gray-600">此報名已確認收款或套票，為避免影響帳務，目前不開放直接變更人數。</div>
+                    <div v-if="row.partyEditing && row.financial_status === 'pending'" class="mt-4 border-t border-orange-100 pt-4 space-y-4">
+                      <div class="flex items-center justify-between gap-2">
+                        <div><div class="font-semibold text-[15px]">調整後總人數</div><div class="text-[14px] text-gray-500">含本人與同行者</div></div>
+                        <div class="flex items-center gap-2">
+                          <button type="button" @click="changeAdminPartySize(row,-1)" :disabled="row.partySaving || Number(row.partySizeDraft) <= 1" class="h-10 w-10 rounded-xl border border-line bg-white text-[20px] font-bold disabled:opacity-40">−</button>
+                          <span class="w-7 text-center text-[20px] font-bold">{{ row.partySizeDraft }}</span>
+                          <button type="button" @click="changeAdminPartySize(row,1)" :disabled="row.partySaving || Number(row.partySizeDraft) >= Math.max(1,Number(adminSelectedSession.capacity)-(Number(adminSelectedSession.registered_count)-Number(row.party_size)))" class="h-10 w-10 rounded-xl border border-line bg-white text-[20px] font-bold disabled:opacity-40">＋</button>
+                        </div>
+                      </div>
+                      <label class="inline-flex items-center gap-2 text-[15px] font-medium"><input v-model="row.partyIsBeginnerDraft" type="checkbox" :disabled="row.partySaving" class="h-4 w-4 accent-orange-500">參加者是新手</label>
+                      <div class="flex items-center justify-between gap-3">
+                        <label class="text-[14px] font-semibold">同行新手人數</label>
+                        <input v-model.number="row.partyCompanionDraft" type="number" min="0" :max="Number(row.partySizeDraft)-1" step="1" :disabled="row.partySaving" class="h-11 w-20 rounded-lg border border-line bg-white px-3 text-[16px]" aria-label="同行新手人數">
+                      </div>
+                      <div class="grid grid-cols-2 gap-3">
+                        <label class="text-[14px] font-semibold">待確認金額（NT$）
+                          <input v-model.number="row.partyAmountDraft" type="number" min="0" step="1" inputmode="numeric" :disabled="row.partySaving" class="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[16px]">
+                        </label>
+                        <label class="text-[14px] font-semibold">預留套票次數
+                          <input v-model.number="row.partyUnitsDraft" type="number" min="0" :max="Number(row.partySizeDraft)*Number(adminSelectedSession.default_package_units||0)" step="1" inputmode="numeric" :disabled="row.partySaving" class="mt-1.5 h-11 w-full rounded-lg border border-line bg-white px-3 text-[16px]">
+                        </label>
+                      </div>
+                      <div class="rounded-xl bg-white border border-orange-100 px-3 py-2 text-[14px] leading-relaxed text-gray-600">人數變動會預填建議金額，請核對金額與套票次數後再儲存。付款仍維持待確認，不會自動收款。</div>
+                      <div v-if="row.partySaveError" role="alert" class="rounded-xl bg-red-50 px-3 py-2 text-[14px] text-red-700">{{ row.partySaveError }}</div>
+                      <div class="flex gap-2">
+                        <button type="button" @click="toggleAdminPartyEdit(row)" :disabled="row.partySaving" class="flex-1 rounded-xl border border-line bg-white py-2.5 text-[15px] font-bold">取消</button>
+                        <button type="button" @click="saveAdminPartySize(row)" :disabled="row.partySaving" class="flex-1 rounded-xl bg-brand-500 py-2.5 text-[15px] font-bold text-white disabled:opacity-50">{{ row.partySaving ? '儲存中…' : '儲存調整' }}</button>
+                      </div>
+                    </div>
+                  </div>
                   <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-gray-100">
                     <button @click="openAdminSubstitute(row)" class="rounded-xl border border-line bg-white text-gray-700 font-bold py-2.5 flex items-center justify-center gap-2">
                       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
@@ -948,23 +984,23 @@
                 <label class="font-bold block mb-2">參加者手機</label>
                 <input v-model.trim="bookingForm.phone" :readonly="bookingForm.mode === 'self'" type="tel" inputmode="tel" class="w-full h-12 rounded-xl border border-line px-4 outline-none focus:border-brand-500 read-only:bg-gray-50">
                 <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px] font-semibold text-gray-600" role="group" aria-label="報名設定">
-                  <label v-if="bookingForm.mode === 'self'" class="inline-flex items-center gap-2 cursor-pointer select-none">
+                  <label class="inline-flex items-center gap-2 cursor-pointer select-none">
                     <input v-model="bookingForm.group" @change="toggleGroupBooking" :disabled="Number(selectedSession?.remaining_spots || 0) < 2" type="checkbox" class="w-4 h-4 accent-orange-500">
-                    <span>團體報名</span>
+                    <span>{{ bookingForm.mode === 'self' ? '團體報名' : '幫朋友團體報名' }}</span>
                   </label>
                   <label class="inline-flex items-center gap-2 cursor-pointer select-none">
                     <input v-model="bookingForm.isBeginner" type="checkbox" class="w-4 h-4 accent-orange-500">
                     <span>{{ bookingForm.mode === 'self' ? '我是新手' : '參加者是新手' }}</span>
                   </label>
-                  <span v-if="bookingForm.mode === 'self' && Number(selectedSession?.remaining_spots || 0) < 2" class="text-[12px] font-normal text-gray-400">剩餘名額不足，無法團體報名</span>
+                  <span v-if="Number(selectedSession?.remaining_spots || 0) < 2" class="text-[12px] font-normal text-gray-400">剩餘名額不足，無法團體報名</span>
                 </div>
               </div>
 
-              <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
+              <div v-if="bookingForm.group" class="rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
                 <div class="flex items-center justify-between gap-4">
                   <div>
                     <div class="font-bold">報名人數</div>
-                    <div class="text-[13px] text-muted mt-1">包含本人，共 {{ bookingForm.partySize }} 位</div>
+                    <div class="text-[13px] text-muted mt-1">包含參加者，共 {{ bookingForm.partySize }} 位</div>
                   </div>
                   <div class="flex items-center gap-3">
                     <button @click="adjustPartySize(-1)" :disabled="bookingForm.partySize <= 2" type="button" class="w-10 h-10 min-h-0 rounded-xl bg-white border border-line font-bold text-[20px] disabled:opacity-35">−</button>
@@ -977,10 +1013,11 @@
                 </div>
               </div>
 
-              <div v-if="bookingForm.mode === 'self' && bookingForm.group" class="text-[14px] text-gray-600">
-                <div class="flex items-center justify-between gap-3"><label for="booking-companions">同行新手人數（不含本人）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line bg-white px-3"></div>
+              <div v-if="bookingForm.group" class="text-[14px] text-gray-600">
+                <div class="flex items-center justify-between gap-3"><label for="booking-companions">同行新手人數（不含參加者）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line bg-white px-3"></div>
               </div>
-              <button @click="submitBooking" :disabled="bookingLoading || bookingAvailabilityLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingAvailabilityLoading ? '更新名額中…' : (bookingLoading ? '送出中…' : (bookingForm.mode === 'self' && bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名')) }}</button>
+              <div v-if="bookingForm.mode === 'friend' && bookingForm.group" class="rounded-xl bg-gray-50 px-3 py-2.5 text-[14px] leading-relaxed text-gray-600">費用與套票將記在參加者帳號，同行人數會一起計算；送出後由主辦方確認收款。</div>
+              <button @click="submitBooking" :disabled="bookingLoading || bookingAvailabilityLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingAvailabilityLoading ? '更新名額中…' : (bookingLoading ? '送出中…' : (bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名')) }}</button>
             </div>
           </div>
         </Transition>
@@ -1655,7 +1692,8 @@
           [/Capacity cannot be lower than the current active booking count|Capacity cannot be lower than the current active participant count/i, '人數上限不能少於目前已報名人數'],
           [/Not enough remaining spots for this party size/i, '剩餘名額不足，請減少團體報名人數'],
           [/Party size must be at least 1/i, '報名人數至少需要 1 位'],
-          [/Group booking is only available for self booking/i, '團體報名僅限本人報名使用'],
+          [/此功能用於幫朋友團體報名/i, '如需替自己團體報名，請切換至「我自己」'],
+          [/Group booking is only available for self booking/i, '此場次目前無法幫朋友進行團體報名'],
           [/Booking payment must use either cash or package units, not both/i, '付款與套票只能選擇一種，不能混搭'],
           [/Booking package payment cannot add package units/i, '場次付款只能扣除套票，不能增加套票'],
           [/Default price cannot be negative/i, '單次費用不能小於 0'],
@@ -2602,7 +2640,7 @@
           const nickname = bookingForm.value.nickname;
           if (!nickname) throw new Error('請輸入參加者暱稱');
           const phone = normalizePhone(bookingForm.value.phone);
-          const group = bookingForm.value.mode === 'self' && bookingForm.value.group;
+          const group = Boolean(bookingForm.value.group);
           const partySize = group ? Math.max(2, Number(bookingForm.value.partySize || 2)) : 1;
           const companionBeginners = group ? Number(bookingForm.value.companionBeginners) : 0;
           const isBeginner = Boolean(bookingForm.value.isBeginner);
@@ -2613,7 +2651,8 @@
           // Refresh this exact session; the booking RPC makes the final capacity decision.
           applySessionAvailability(await fetchSessionAvailability(sessionId));
           attemptedBooking = true;
-          const { error } = await sb.rpc('create_booking_with_beginners', {
+          const bookingRpc = !selfBooking && group ? 'create_friend_group_booking' : 'create_booking_with_beginners';
+          const { error } = await sb.rpc(bookingRpc, {
             p_session_id: sessionId,
             p_phone: phone,
             p_nickname: nickname,
@@ -2629,7 +2668,7 @@
             const roster = await sb.rpc('get_public_roster_with_beginners', { p_session_id: sessionId });
             if (!roster.error) publicRoster.value = roster.data || [];
           }
-          showToast(selfBooking ? '報名成功，等待主辦方確認收款' : '已成功幫朋友報名');
+          showToast(selfBooking ? '報名成功，等待主辦方確認收款' : (group ? `已成功幫朋友報名 ${partySize} 位，等待主辦方確認收款` : '已成功幫朋友報名'));
         } catch (e) {
           // Preserve the original rejection and entered form even if refreshing fails.
           if (attemptedBooking) {
@@ -2736,6 +2775,94 @@
           showToast(friendlyError(e));
         } finally {
           substituteLoading.value = false;
+        }
+      }
+
+      function toggleAdminPartyEdit(row) {
+        if (row.partySaving || adminActionLoading.value) return;
+        if (row.partyEditing) { row.partyEditing = false; row.partySaveError = ''; return; }
+        if (adminSelectedSession.value?.status !== 'open' || row.booking_status !== 'active') return;
+        if (row.financial_status !== 'pending') { showToast('已確認收款的報名，請先核對財務後再調整人數'); return; }
+        row.partyBaseSize = Math.max(1, Number(row.party_size || 1));
+        row.partyBaseAmount = Math.max(0, Number(row.amount || 0));
+        row.partyBaseUnits = Math.max(0, -Number(row.package_delta || 0));
+        row.partySizeDraft = row.partyBaseSize;
+        row.partyIsBeginnerDraft = Boolean(row.is_beginner);
+        row.partyCompanionDraft = Number(row.companion_beginner_count || 0);
+        row.partyAmountDraft = row.partyBaseAmount;
+        row.partyUnitsDraft = row.partyBaseUnits;
+        row.partySaveError = '';
+        row.partyEditing = true;
+      }
+
+      function changeAdminPartySize(row, change) {
+        if (!row.partyEditing || row.partySaving) return;
+        const session = adminSelectedSession.value;
+        if (!session) return;
+        const others = Number(session.registered_count || 0) - Number(row.party_size || 1);
+        const maxSize = Math.max(1, Number(session.capacity || 1) - others);
+        const newSize = Math.min(maxSize, Math.max(1, Number(row.partySizeDraft || 1) + change));
+        row.partySizeDraft = newSize;
+        row.partyCompanionDraft = Math.min(Number(row.partyCompanionDraft || 0), newSize - 1);
+        const delta = newSize - Number(row.partyBaseSize || 1);
+        const price = Math.max(0, Number(session.default_price || 0));
+        const unitsPer = Math.max(0, Number(session.default_package_units || 0));
+        const originalCash = Number(row.partyBaseAmount || 0);
+        const originalUnits = Number(row.partyBaseUnits || 0);
+        if (delta >= 0) {
+          row.partyAmountDraft = originalCash + delta * price;
+          row.partyUnitsDraft = originalUnits;
+        } else {
+          const removed = -delta;
+          const cashSeats = price > 0 ? Math.min(removed, Math.floor(originalCash / price)) : 0;
+          row.partyAmountDraft = Math.max(0, originalCash - cashSeats * price);
+          row.partyUnitsDraft = Math.max(0, originalUnits - (removed - cashSeats) * unitsPer);
+        }
+        row.partySaveError = '';
+      }
+
+      async function saveAdminPartySize(row) {
+        if (!row.partyEditing || row.partySaving || adminActionLoading.value) return;
+        const size = Number(row.partySizeDraft);
+        const companions = Number(row.partyCompanionDraft);
+        const amount = Number(row.partyAmountDraft);
+        const units = Number(row.partyUnitsDraft);
+        const beginner = Boolean(row.partyIsBeginnerDraft);
+        if (!Number.isInteger(size) || size < 1 || !Number.isInteger(companions)
+          || companions < 0 || companions >= size || !Number.isInteger(amount)
+          || amount < 0 || !Number.isInteger(units) || units < 0) {
+          row.partySaveError = '請確認報名人數、同行新手、金額及套票次數皆為有效整數';
+          return;
+        }
+        if (size === Number(row.party_size) && companions === Number(row.companion_beginner_count || 0)
+          && beginner === Boolean(row.is_beginner) && amount === Number(row.amount || 0)
+          && units === -Number(row.package_delta || 0)) {
+          row.partySaveError = '尚未修改內容';
+          return;
+        }
+        row.partySaveError = '';
+        row.partySaving = true;
+        try {
+          const { error } = await sb.rpc('admin_update_booking_party_size', {
+            p_booking_id: row.booking_id,
+            p_party_size: size,
+            p_is_beginner: beginner,
+            p_companion_beginner_count: companions,
+            p_amount: amount,
+            p_package_units: units
+          });
+          if (error) throw error;
+          row.partyEditing = false;
+          try {
+            await Promise.all([refreshAdminDetail(), loadPublicSessions(), loadMyData(true)]);
+            showToast('已將「' + row.nickname + '」的報名調整為 ' + size + ' 人，付款仍待確認');
+          } catch (refreshError) {
+            showToast('人數已儲存，請重新整理場次以取得最新資料');
+          }
+        } catch (e) {
+          row.partySaveError = friendlyError(e);
+        } finally {
+          row.partySaving = false;
         }
       }
 
@@ -3443,6 +3570,7 @@
         startBooking, setBookingMode, toggleGroupBooking, adjustPartySize, submitBooking,
         loadMyData, loadMoreBookings, loadMoreFinance,
         cancelMyBooking, openSubstitute, openAdminSubstitute, submitSubstitute, cancelAdminBooking,
+        toggleAdminPartyEdit, changeAdminPartySize, saveAdminPartySize,
         openProfile, saveProfile, toggleOwnPhoneEdit, changeOwnPhone, toggleOwnPasswordEdit, changeOwnPassword,
         openAdminSession, startSettledNoteEdit, cancelSettledNoteEdit, saveSettledInternalNote,
         confirmFinance, reopenFinance, openFinanceEdit, saveFinanceEdit,
