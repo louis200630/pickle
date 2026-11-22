@@ -2778,6 +2778,94 @@
         }
       }
 
+      function toggleAdminPartyEdit(row) {
+        if (row.partySaving || adminActionLoading.value) return;
+        if (row.partyEditing) { row.partyEditing = false; row.partySaveError = ''; return; }
+        if (adminSelectedSession.value?.status !== 'open' || row.booking_status !== 'active') return;
+        if (row.financial_status !== 'pending') { showToast('已確認收款的報名，請先核對財務後再調整人數'); return; }
+        row.partyBaseSize = Math.max(1, Number(row.party_size || 1));
+        row.partyBaseAmount = Math.max(0, Number(row.amount || 0));
+        row.partyBaseUnits = Math.max(0, -Number(row.package_delta || 0));
+        row.partySizeDraft = row.partyBaseSize;
+        row.partyIsBeginnerDraft = Boolean(row.is_beginner);
+        row.partyCompanionDraft = Number(row.companion_beginner_count || 0);
+        row.partyAmountDraft = row.partyBaseAmount;
+        row.partyUnitsDraft = row.partyBaseUnits;
+        row.partySaveError = '';
+        row.partyEditing = true;
+      }
+
+      function changeAdminPartySize(row, change) {
+        if (!row.partyEditing || row.partySaving) return;
+        const session = adminSelectedSession.value;
+        if (!session) return;
+        const others = Number(session.registered_count || 0) - Number(row.party_size || 1);
+        const maxSize = Math.max(1, Number(session.capacity || 1) - others);
+        const newSize = Math.min(maxSize, Math.max(1, Number(row.partySizeDraft || 1) + change));
+        row.partySizeDraft = newSize;
+        row.partyCompanionDraft = Math.min(Number(row.partyCompanionDraft || 0), newSize - 1);
+        const delta = newSize - Number(row.partyBaseSize || 1);
+        const price = Math.max(0, Number(session.default_price || 0));
+        const unitsPer = Math.max(0, Number(session.default_package_units || 0));
+        const originalCash = Number(row.partyBaseAmount || 0);
+        const originalUnits = Number(row.partyBaseUnits || 0);
+        if (delta >= 0) {
+          row.partyAmountDraft = originalCash + delta * price;
+          row.partyUnitsDraft = originalUnits;
+        } else {
+          const removed = -delta;
+          const cashSeats = price > 0 ? Math.min(removed, Math.floor(originalCash / price)) : 0;
+          row.partyAmountDraft = Math.max(0, originalCash - cashSeats * price);
+          row.partyUnitsDraft = Math.max(0, originalUnits - (removed - cashSeats) * unitsPer);
+        }
+        row.partySaveError = '';
+      }
+
+      async function saveAdminPartySize(row) {
+        if (!row.partyEditing || row.partySaving || adminActionLoading.value) return;
+        const size = Number(row.partySizeDraft);
+        const companions = Number(row.partyCompanionDraft);
+        const amount = Number(row.partyAmountDraft);
+        const units = Number(row.partyUnitsDraft);
+        const beginner = Boolean(row.partyIsBeginnerDraft);
+        if (!Number.isInteger(size) || size < 1 || !Number.isInteger(companions)
+          || companions < 0 || companions >= size || !Number.isInteger(amount)
+          || amount < 0 || !Number.isInteger(units) || units < 0) {
+          row.partySaveError = '請確認報名人數、同行新手、金額及套票次數皆為有效整數';
+          return;
+        }
+        if (size === Number(row.party_size) && companions === Number(row.companion_beginner_count || 0)
+          && beginner === Boolean(row.is_beginner) && amount === Number(row.amount || 0)
+          && units === -Number(row.package_delta || 0)) {
+          row.partySaveError = '尚未修改內容';
+          return;
+        }
+        row.partySaveError = '';
+        row.partySaving = true;
+        try {
+          const { error } = await sb.rpc('admin_update_booking_party_size_test', {
+            p_booking_id: row.booking_id,
+            p_party_size: size,
+            p_is_beginner: beginner,
+            p_companion_beginner_count: companions,
+            p_amount: amount,
+            p_package_units: units
+          });
+          if (error) throw error;
+          row.partyEditing = false;
+          try {
+            await Promise.all([refreshAdminDetail(), loadPublicSessions(), loadMyData(true)]);
+            showToast('已將「' + row.nickname + '」的報名調整為 ' + size + ' 人，付款仍待確認');
+          } catch (refreshError) {
+            showToast('人數已儲存，請重新整理場次以取得最新資料');
+          }
+        } catch (e) {
+          row.partySaveError = friendlyError(e);
+        } finally {
+          row.partySaving = false;
+        }
+      }
+
       async function cancelAdminBooking(row) {
         const confirmed = row.financial_status === 'confirmed';
         const message = confirmed
@@ -3482,6 +3570,7 @@
         startBooking, setBookingMode, toggleGroupBooking, adjustPartySize, submitBooking,
         loadMyData, loadMoreBookings, loadMoreFinance,
         cancelMyBooking, openSubstitute, openAdminSubstitute, submitSubstitute, cancelAdminBooking,
+        toggleAdminPartyEdit, changeAdminPartySize, saveAdminPartySize,
         openProfile, saveProfile, toggleOwnPhoneEdit, changeOwnPhone, toggleOwnPasswordEdit, changeOwnPassword,
         openAdminSession, startSettledNoteEdit, cancelSettledNoteEdit, saveSettledInternalNote,
         confirmFinance, reopenFinance, openFinanceEdit, saveFinanceEdit,
