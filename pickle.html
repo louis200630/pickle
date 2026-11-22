@@ -950,7 +950,7 @@
                 <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px] font-semibold text-gray-600" role="group" aria-label="報名設定">
                   <label class="inline-flex items-center gap-2 cursor-pointer select-none">
                     <input v-model="bookingForm.group" @change="toggleGroupBooking" :disabled="Number(selectedSession?.remaining_spots || 0) < 2" type="checkbox" class="w-4 h-4 accent-orange-500">
-                    <span>團體報名</span>
+                    <span>{{ bookingForm.mode === 'self' ? '團體報名' : '幫朋友團體報名' }}</span>
                   </label>
                   <label class="inline-flex items-center gap-2 cursor-pointer select-none">
                     <input v-model="bookingForm.isBeginner" type="checkbox" class="w-4 h-4 accent-orange-500">
@@ -978,8 +978,9 @@
               </div>
 
               <div v-if="bookingForm.group" class="text-[14px] text-gray-600">
-                <div class="flex items-center justify-between gap-3"><label for="booking-companions">同行新手人數（不含本人）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line bg-white px-3"></div>
+                <div class="flex items-center justify-between gap-3"><label for="booking-companions">同行新手人數（不含參加者）</label><input id="booking-companions" v-model.number="bookingForm.companionBeginners" type="number" min="0" :max="bookingForm.partySize - 1" step="1" class="w-20 h-10 rounded-lg border border-line bg-white px-3"></div>
               </div>
+              <div v-if="bookingForm.mode === 'friend' && bookingForm.group" class="rounded-xl bg-gray-50 px-3 py-2.5 text-[14px] leading-relaxed text-gray-600">費用與套票將記在參加者帳號，同行人數會一起計算；送出後由主辦方確認收款。</div>
               <button @click="submitBooking" :disabled="bookingLoading || bookingAvailabilityLoading" class="w-full rounded-xl bg-brand-500 text-white font-bold text-[17px] py-3.5 disabled:opacity-50">{{ bookingAvailabilityLoading ? '更新名額中…' : (bookingLoading ? '送出中…' : (bookingForm.group ? `送出報名 ${bookingForm.partySize} 位` : '送出報名')) }}</button>
             </div>
           </div>
